@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: elga-cafe
+    runtime: php
+    buildCommand: ""
+    startCommand: "php -S 0.0.0.0:10000 -t ."
+    envVars:
+      - key: DB_HOST
+        value: fhunzl.h.filess.io
+      - key: DB_NAME
+        value: meal_menu_db_sometimego
+      - key: DB_USER
+        value: meal_menu_db_sometimego
+      - key: DB_PASS
+        value: 238446391c2971f7d2668dd6be72bf408400ce26
