@@ -1,38 +1,26 @@
 <?php
-// Start session at the very beginning
+// Start session
 if(session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 // Database configuration
-define('DB_HOST', getenv('DB_HOST') ?: 'fhunzl.h.filess.io');
-define('DB_NAME', getenv('DB_NAME') ?: 'meal_menu_db_sometimego');
-define('DB_USER', getenv('DB_USER') ?: 'meal_menu_db_sometimego');
-define('DB_PASS', getenv('DB_PASS') ?: '238446391c2971f7d2668dd6be72bf408400ce26');
+$db_host = getenv('DB_HOST') ?: 'fhunzl.h.filess.io';
+$db_name = getenv('DB_NAME') ?: 'meal_menu_db_sometimego';
+$db_user = getenv('DB_USER') ?: 'meal_menu_db_sometimego';
+$db_pass = getenv('DB_PASS') ?: '238446391c2971f7d2668dd6be72bf408400ce26';
 
-// Create database connection
 try {
-    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";port=3306", DB_USER, DB_PASS);
+    $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;port=3306", $db_user, $db_pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
     $pdo->exec("SET NAMES utf8mb4");
 } catch(PDOException $e) {
-    error_log("Connection failed: " . $e->getMessage());
-    // Don't expose database errors in production
-    if(getenv('RENDER') !== 'true') {
-        die("Connection failed: " . $e->getMessage());
-    } else {
-        die("Unable to connect to database. Please try again later.");
-    }
+    error_log("Database connection failed: " . $e->getMessage());
+    die("Unable to connect to database. Please try again later.");
 }
 
-// Set timezone
 date_default_timezone_set('UTC');
-
-// Site configuration
 define('SITE_NAME', 'Elga Cafe');
-define('SITE_URL', getenv('RENDER_EXTERNAL_URL') ?: 'http://localhost');
-
-// Debug mode - set to false in production
 define('DEBUG_MODE', false);
 ?>
