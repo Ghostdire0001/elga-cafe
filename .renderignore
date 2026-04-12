@@ -1,0 +1,7 @@
+Dockerfile.backup
+.gitignore
+README.md
+.vscode/
+.idea/
+*.log
+tmp/  
