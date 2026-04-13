@@ -7,10 +7,10 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 $message = '';
 $error = '';
 
-// Cloudinary upload function using unsigned preset (working version from test)
+// Cloudinary upload function using unsigned preset
 function uploadToCloudinary($file) {
     $cloud_name = CLOUDINARY_CLOUD_NAME;
-    $upload_preset = 'elga_cafe_unsigned'; // The preset you created
+    $upload_preset = 'elga_cafe_unsigned';
     
     if (empty($cloud_name)) {
         error_log("Cloudinary cloud name missing");
@@ -74,7 +74,7 @@ function uploadToCloudinary($file) {
     return null;
 }
 
-// Handle Add/Edit Meal
+// Handle POST request (Add/Edit) - MUST be BEFORE any output
 if(($_SERVER['REQUEST_METHOD'] === 'POST') && in_array($action, ['add', 'edit'])) {
     $name = trim($_POST['name']);
     $description = trim($_POST['description']);
@@ -129,7 +129,7 @@ if(($_SERVER['REQUEST_METHOD'] === 'POST') && in_array($action, ['add', 'edit'])
     }
 }
 
-// Handle Delete
+// Handle Delete (GET request)
 if($action == 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
     $pdo->prepare("DELETE FROM meal_dietary_labels WHERE meal_id = ?")->execute([$id]);
@@ -138,7 +138,7 @@ if($action == 'delete' && isset($_GET['id'])) {
     exit();
 }
 
-// Handle Toggle Availability
+// Handle Toggle Availability (GET request)
 if($action == 'toggle' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
     $pdo->prepare("UPDATE meals SET availability = NOT availability WHERE id = ?")->execute([$id]);
@@ -170,11 +170,12 @@ $meals = $pdo->query("SELECT m.*, c.name as category_name
                       FROM meals m 
                       LEFT JOIN categories c ON m.category_id = c.id 
                       ORDER BY m.id DESC")->fetchAll();
+?>
 
-// Display messages
-if(isset($_GET['message'])): ?>
+<?php if(isset($_GET['message'])): ?>
     <div class="alert-success"><?php echo htmlspecialchars($_GET['message']); ?></div>
 <?php endif; ?>
+
 <?php if(isset($error)): ?>
     <div class="alert-error"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
