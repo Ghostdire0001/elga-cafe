@@ -27,7 +27,14 @@ define('SITE_NAME', 'Elga Cafe');
 define('DEBUG_MODE', false);
 // Add at the end of your config.php
 // Cloudinary configuration (from environment variables)
-define('CLOUDINARY_CLOUD_NAME', getenv('CLOUDINARY_CLOUD_NAME') ?: 'YOUR_CLOUD_NAME');
-define('CLOUDINARY_API_KEY', getenv('CLOUDINARY_API_KEY') ?: 'YOUR_API_KEY');
-define('CLOUDINARY_API_SECRET', getenv('CLOUDINARY_API_SECRET') ?: 'YOUR_API_SECRET');
+
+// Cloudinary configuration - from environment variables ONLY
+define('CLOUDINARY_CLOUD_NAME', getenv('CLOUDINARY_CLOUD_NAME'));
+define('CLOUDINARY_API_KEY', getenv('CLOUDINARY_API_KEY'));
+define('CLOUDINARY_API_SECRET', getenv('CLOUDINARY_API_SECRET'));
+
+// Check if Cloudinary is configured (optional)
+if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
+    error_log("Cloudinary credentials not configured in environment variables");
+}
 ?>
