@@ -8,19 +8,20 @@ $message = '';
 $error = '';
 
 // Cloudinary upload function - uses constants from config.php
+// Fixed Cloudinary upload function
 function uploadToCloudinary($file) {
-    // Get credentials from config.php constants
     $cloud_name = CLOUDINARY_CLOUD_NAME;
     $api_key = CLOUDINARY_API_KEY;
     $api_secret = CLOUDINARY_API_SECRET;
     
-    // Check if credentials are set
-    if (!$cloud_name || !$api_key || !$api_secret) {
-        error_log("Cloudinary credentials not configured");
+    // Check if credentials exist
+    if (empty($cloud_name) || empty($api_key) || empty($api_secret)) {
+        error_log("Cloudinary credentials missing");
         return null;
     }
     
     if ($file['error'] !== UPLOAD_ERR_OK) {
+        error_log("File upload error: " . $file['error']);
         return null;
     }
     
@@ -31,55 +32,65 @@ function uploadToCloudinary($file) {
     finfo_close($finfo);
     
     if (!in_array($mime_type, $allowed_types)) {
+        error_log("Invalid file type: " . $mime_type);
         return false;
     }
     
     // Validate file size (max 5MB)
     if ($file['size'] > 5 * 1024 * 1024) {
+        error_log("File too large: " . $file['size']);
         return false;
     }
     
-    // Prepare upload to Cloudinary
-    $curl = curl_init();
+    // Prepare upload parameters (order matters for signature)
     $timestamp = time();
-    $filename = pathinfo($file['name'], PATHINFO_FILENAME);
-    $public_id = 'elga-cafe/meals/' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $filename) . '_' . $timestamp;
+    $folder = 'elga-cafe/meals';
+    $public_id = $folder . '/' . preg_replace('/[^a-zA-Z0-9_-]/', '_', pathinfo($file['name'], PATHINFO_FILENAME)) . '_' . $timestamp;
     
-    // Cloudinary upload API endpoint
-    $url = "https://api.cloudinary.com/v1_1/$cloud_name/image/upload";
-    
-    // Prepare POST fields
-    $post_fields = [
-        'file' => curl_file_create($file['tmp_name'], $mime_type, $file['name']),
-        'public_id' => $public_id,
+    // Parameters to sign - these must be in alphabetical order
+    $params_to_sign = [
         'api_key' => $api_key,
+        'public_id' => $public_id,
         'timestamp' => $timestamp,
     ];
     
-    // Generate signature
-    ksort($post_fields);
+    // Build string to sign (alphabetical order, no spaces)
     $signature_string = '';
-    foreach ($post_fields as $key => $value) {
-        if ($key !== 'file') {
-            $signature_string .= $key . '=' . $value . '&';
-        }
+    foreach ($params_to_sign as $key => $value) {
+        $signature_string .= $key . '=' . $value . '&';
     }
     $signature_string = rtrim($signature_string, '&');
+    
+    // Generate signature using HMAC-SHA256
     $signature = hash_hmac('sha256', $signature_string, $api_secret);
-    $post_fields['signature'] = $signature;
     
-    curl_setopt_array($curl, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $post_fields,
-        CURLOPT_TIMEOUT => 30,
-    ]);
+    // Read file and encode as base64
+    $image_data = base64_encode(file_get_contents($file['tmp_name']));
     
-    $response = curl_exec($curl);
-    $http_code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-    $curl_error = curl_error($curl);
-    curl_close($curl);
+    // Complete upload data
+    $upload_data = [
+        'file' => 'data:' . $mime_type . ';base64,' . $image_data,
+        'public_id' => $public_id,
+        'api_key' => $api_key,
+        'timestamp' => $timestamp,
+        'signature' => $signature,
+    ];
+    
+    // Send to Cloudinary
+    $url = "https://api.cloudinary.com/v1_1/$cloud_name/image/upload";
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($upload_data));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_error = curl_error($ch);
+    curl_close($ch);
     
     if ($curl_error) {
         error_log("CURL Error: " . $curl_error);
@@ -88,10 +99,12 @@ function uploadToCloudinary($file) {
     
     if ($http_code === 200) {
         $result = json_decode($response, true);
-        return $result['secure_url'];
+        if (isset($result['secure_url'])) {
+            return $result['secure_url'];
+        }
     }
     
-    error_log("Cloudinary upload failed. HTTP Code: $http_code, Response: $response");
+    error_log("Cloudinary upload failed. HTTP: $http_code, Response: " . substr($response, 0, 500));
     return null;
 }
 
