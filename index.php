@@ -1,7 +1,4 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
@@ -10,22 +7,10 @@ $category_id = isset($_GET['category']) ? (int)$_GET['category'] : null;
 $dietary_ids = isset($_GET['dietary']) ? array_map('intval', (array)$_GET['dietary']) : [];
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
-// Debug: Check if we have meals
-try {
-    // Get data
-    $categories = getCategories($pdo);
-    $dietary_labels = getDietaryLabels($pdo);
-    $meals = getMeals($pdo, $category_id, $dietary_ids, $search);
-    
-    // Debug: Check if meals are found
-    if(empty($meals)) {
-        // Test query to see if any meals exist
-        $test = $pdo->query("SELECT COUNT(*) as total FROM meals WHERE availability = 1")->fetch();
-        error_log("Total available meals: " . $test['total']);
-    }
-} catch(Exception $e) {
-    die("Error loading menu: " . $e->getMessage());
-}
+// Get data
+$categories = getCategories($pdo);
+$dietary_labels = getDietaryLabels($pdo);
+$meals = getMeals($pdo, $category_id, $dietary_ids, $search);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -40,19 +25,43 @@ try {
         .text-orange-custom { color: #F97316; }
         .hover\:bg-orange-custom:hover { background-color: #F97316; }
         .border-orange-custom { border-color: #F97316; }
+        
         .meal-card {
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
+        
         .meal-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 10px 30px -5px rgba(0,0,0,0.15);
+        }
+        
+        .meal-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+        
+        .meal-card:hover .meal-image {
+            transform: scale(1.05);
+        }
+        
+        .image-container {
+            overflow: hidden;
+            position: relative;
+        }
+        
+        @media (max-width: 640px) {
+            .meal-image {
+                height: 180px;
+            }
         }
     </style>
 </head>
 <body class="bg-gray-50">
     <!-- Header -->
     <header class="bg-orange-custom text-white shadow-lg sticky top-0 z-50">
-        <div class="container mx-auto px-4 py-4">
+        <div class="container mx-auto px-4 py-4 md:py-6">
             <div class="flex justify-between items-center">
                 <div>
                     <h1 class="text-2xl md:text-3xl font-bold">Elga Cafe</h1>
@@ -68,77 +77,72 @@ try {
     </header>
 
     <!-- Search and Filters -->
-    <div class="container mx-auto px-4 py-6">
-        <form method="GET" action="" id="filterForm">
-            <div class="bg-white rounded-lg shadow-md p-4 mb-6">
-                <div class="flex flex-col md:flex-row gap-4">
-                    <!-- Search Bar -->
-                    <div class="flex-1">
-                        <div class="relative">
-                            <input type="text" name="search" id="search" 
-                                   value="<?php echo htmlspecialchars($search); ?>" 
-                                   placeholder="Search menu items..." 
-                                   class="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom focus:ring-1 focus:ring-orange-custom">
-                            <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
-                        </div>
-                    </div>
-                    
-                    <!-- Category Filter -->
-                    <div>
-                        <select name="category" id="category" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom focus:ring-1 focus:ring-orange-custom">
-                            <option value="">All Categories</option>
-                            <?php foreach($categories as $cat): ?>
-                                <option value="<?php echo $cat['id']; ?>" <?php echo $category_id == $cat['id'] ? 'selected' : ''; ?>>
-                                    <i class="fas <?php echo $cat['icon_class']; ?>"></i> <?php echo ucfirst($cat['name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+    <div class="container mx-auto px-4 py-6 md:py-8">
+        <form method="GET" action="" class="mb-6 md:mb-8">
+            <div class="flex flex-col md:flex-row gap-4">
+                <!-- Search Bar -->
+                <div class="flex-1">
+                    <div class="relative">
+                        <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" 
+                               placeholder="Search menu..." 
+                               class="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom focus:ring-1 focus:ring-orange-custom">
+                        <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
                     </div>
                 </div>
                 
-                <!-- Dietary Filters -->
-                <?php if(!empty($dietary_labels)): ?>
-                <div class="mt-4">
-                    <div class="flex flex-wrap gap-2 items-center">
-                        <span class="text-gray-600 text-sm font-semibold">Dietary:</span>
-                        <?php foreach($dietary_labels as $label): ?>
-                            <label class="inline-flex items-center cursor-pointer hover:opacity-75 transition-opacity">
-                                <input type="checkbox" name="dietary[]" value="<?php echo $label['id']; ?>" 
-                                       class="dietary-checkbox mr-1 hidden"
-                                       <?php echo in_array($label['id'], $dietary_ids) ? 'checked' : ''; ?>>
-                                <span class="text-sm px-3 py-1 rounded-full transition-all" 
-                                      style="background-color: <?php echo $label['color_hex']; ?>20; color: <?php echo $label['color_hex']; ?>; border: 1px solid <?php echo $label['color_hex']; ?>40">
-                                    <i class="fas <?php echo $label['icon_class']; ?> mr-1"></i>
-                                    <?php echo ucfirst($label['name']); ?>
-                                </span>
-                            </label>
+                <!-- Category Filter -->
+                <div>
+                    <select name="category" onchange="this.form.submit()" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom">
+                        <option value="">All Categories</option>
+                        <?php foreach($categories as $cat): ?>
+                            <option value="<?php echo $cat['id']; ?>" <?php echo $category_id == $cat['id'] ? 'selected' : ''; ?>>
+                                <?php echo ucfirst($cat['name']); ?>
+                            </option>
                         <?php endforeach; ?>
-                    </div>
+                    </select>
                 </div>
-                <?php endif; ?>
             </div>
+            
+            <!-- Dietary Filters -->
+            <?php if(!empty($dietary_labels)): ?>
+            <div class="mt-4 flex flex-wrap gap-2">
+                <span class="text-gray-600 mr-2 text-sm">Dietary:</span>
+                <?php foreach($dietary_labels as $label): ?>
+                    <label class="inline-flex items-center cursor-pointer hover:opacity-75 transition">
+                        <input type="checkbox" name="dietary[]" value="<?php echo $label['id']; ?>" 
+                               onchange="this.form.submit()"
+                               <?php echo in_array($label['id'], $dietary_ids) ? 'checked' : ''; ?>
+                               class="mr-1">
+                        <span class="text-sm px-2 py-1 rounded-full" style="background-color: <?php echo $label['color_hex']; ?>20; color: <?php echo $label['color_hex']; ?>; border: 1px solid <?php echo $label['color_hex']; ?>40">
+                            <i class="fas <?php echo $label['icon_class']; ?> text-xs"></i>
+                            <span class="ml-1"><?php echo ucfirst($label['name']); ?></span>
+                        </span>
+                    </label>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
         </form>
 
         <!-- Results Count -->
         <div class="mb-4">
-            <p class="text-gray-600">
+            <p class="text-gray-600 text-sm">
                 <i class="fas fa-utensils mr-1"></i> 
                 Found <strong><?php echo count($meals); ?></strong> menu items
             </p>
         </div>
 
         <!-- Menu Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             <?php if(empty($meals)): ?>
-                <div class="col-span-full text-center py-16">
-                    <div class="bg-white rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-4 shadow-lg">
-                        <i class="fas fa-search text-4xl text-gray-400"></i>
+                <div class="col-span-full text-center py-12 md:py-16">
+                    <div class="bg-white rounded-full w-20 h-20 md:w-24 md:h-24 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <i class="fas fa-search text-3xl md:text-4xl text-gray-400"></i>
                     </div>
                     <p class="text-gray-500 text-lg mb-2">No meals found</p>
-                    <p class="text-gray-400">Try adjusting your search or filters</p>
-                    <button onclick="resetFilters()" class="mt-4 bg-orange-custom text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition">
+                    <p class="text-gray-400 text-sm">Try adjusting your search or filters</p>
+                    <a href="index.php" class="inline-block mt-4 bg-orange-custom text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition">
                         Reset Filters
-                    </button>
+                    </a>
                 </div>
             <?php endif; ?>
             
@@ -148,13 +152,15 @@ try {
             ?>
                 <div class="meal-card bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300">
                     <!-- Image Section -->
-                    <div class="relative h-48 overflow-hidden bg-gradient-to-br from-orange-100 to-orange-200">
-                        <?php if($meal['image_url'] && file_exists($meal['image_url'])): ?>
-                            <img src="<?php echo $meal['image_url']; ?>" alt="<?php echo htmlspecialchars($meal['name']); ?>" 
-                                 class="w-full h-full object-cover">
+                    <div class="image-container relative bg-gradient-to-br from-orange-100 to-orange-200">
+                        <?php if($meal['image_url']): ?>
+                            <img src="<?php echo $meal['image_url']; ?>" 
+                                 alt="<?php echo htmlspecialchars($meal['name']); ?>" 
+                                 class="meal-image w-full h-48 object-cover"
+                                 loading="lazy">
                         <?php else: ?>
-                            <div class="w-full h-full flex items-center justify-center">
-                                <i class="fas fa-utensils text-6xl text-orange-300"></i>
+                            <div class="w-full h-48 flex items-center justify-center">
+                                <i class="fas fa-utensils text-5xl md:text-6xl text-orange-300"></i>
                             </div>
                         <?php endif; ?>
                         
@@ -233,10 +239,10 @@ try {
     </div>
 
     <!-- Footer -->
-    <footer class="bg-gray-800 text-white mt-12 py-8">
+    <footer class="bg-gray-800 text-white mt-12 py-6 md:py-8">
         <div class="container mx-auto px-4 text-center">
             <div class="mb-4">
-                <i class="fas fa-mug-hot text-3xl text-orange-custom"></i>
+                <i class="fas fa-mug-hot text-2xl md:text-3xl text-orange-custom"></i>
             </div>
             <p class="text-lg font-semibold mb-2">Elga Cafe</p>
             <p class="text-gray-400 text-sm">Delicious meals made with love</p>
@@ -246,28 +252,22 @@ try {
 
     <script>
         // Auto-submit form when filters change
-        document.getElementById('category')?.addEventListener('change', function() {
-            document.getElementById('filterForm').submit();
-        });
-        
-        document.querySelectorAll('.dietary-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-                document.getElementById('filterForm').submit();
+        document.querySelectorAll('select, input[type="checkbox"]').forEach(element => {
+            element.addEventListener('change', function() {
+                this.form.submit();
             });
         });
         
         // Search with debounce
         let searchTimeout;
-        document.getElementById('search')?.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                document.getElementById('filterForm').submit();
-            }, 500);
-        });
-        
-        // Reset filters
-        function resetFilters() {
-            window.location.href = window.location.pathname;
+        const searchInput = document.querySelector('input[name="search"]');
+        if(searchInput) {
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    this.form.submit();
+                }, 500);
+            });
         }
     </script>
 </body>
