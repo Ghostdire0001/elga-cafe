@@ -3,16 +3,23 @@ $page_title = 'Manage Meals';
 require_once '../includes/config.php';
 require_once 'includes/header.php';
 
-// Create uploads directory if it doesn't exist
-$upload_dir = '../uploads/meals/';
-if (!file_exists($upload_dir)) {
-    mkdir($upload_dir, 0777, true);
-}
-
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
+$message = '';
+$error = '';
 
-// Helper function to upload image
-function uploadImage($file, $upload_dir) {
+// Cloudinary upload function - uses constants from config.php
+function uploadToCloudinary($file) {
+    // Get credentials from config.php constants
+    $cloud_name = CLOUDINARY_CLOUD_NAME;
+    $api_key = CLOUDINARY_API_KEY;
+    $api_secret = CLOUDINARY_API_SECRET;
+    
+    // Check if credentials are set
+    if (!$cloud_name || !$api_key || !$api_secret) {
+        error_log("Cloudinary credentials not configured");
+        return null;
+    }
+    
     if ($file['error'] !== UPLOAD_ERR_OK) {
         return null;
     }
@@ -27,15 +34,64 @@ function uploadImage($file, $upload_dir) {
         return false;
     }
     
-    // Generate unique filename
-    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $filename = uniqid() . '_' . time() . '.' . $extension;
-    $destination = $upload_dir . $filename;
-    
-    if (move_uploaded_file($file['tmp_name'], $destination)) {
-        return '/uploads/meals/' . $filename;
+    // Validate file size (max 5MB)
+    if ($file['size'] > 5 * 1024 * 1024) {
+        return false;
     }
     
+    // Prepare upload to Cloudinary
+    $curl = curl_init();
+    $timestamp = time();
+    $filename = pathinfo($file['name'], PATHINFO_FILENAME);
+    $public_id = 'elga-cafe/meals/' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $filename) . '_' . $timestamp;
+    
+    // Cloudinary upload API endpoint
+    $url = "https://api.cloudinary.com/v1_1/$cloud_name/image/upload";
+    
+    // Prepare POST fields
+    $post_fields = [
+        'file' => curl_file_create($file['tmp_name'], $mime_type, $file['name']),
+        'public_id' => $public_id,
+        'api_key' => $api_key,
+        'timestamp' => $timestamp,
+    ];
+    
+    // Generate signature
+    ksort($post_fields);
+    $signature_string = '';
+    foreach ($post_fields as $key => $value) {
+        if ($key !== 'file') {
+            $signature_string .= $key . '=' . $value . '&';
+        }
+    }
+    $signature_string = rtrim($signature_string, '&');
+    $signature = hash_hmac('sha256', $signature_string, $api_secret);
+    $post_fields['signature'] = $signature;
+    
+    curl_setopt_array($curl, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $post_fields,
+        CURLOPT_TIMEOUT => 30,
+    ]);
+    
+    $response = curl_exec($curl);
+    $http_code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $curl_error = curl_error($curl);
+    curl_close($curl);
+    
+    if ($curl_error) {
+        error_log("CURL Error: " . $curl_error);
+        return null;
+    }
+    
+    if ($http_code === 200) {
+        $result = json_decode($response, true);
+        return $result['secure_url'];
+    }
+    
+    error_log("Cloudinary upload failed. HTTP Code: $http_code, Response: $response");
     return null;
 }
 
@@ -51,14 +107,16 @@ if(($_SERVER['REQUEST_METHOD'] === 'POST') && in_array($action, ['add', 'edit'])
     $is_featured = isset($_POST['is_featured']) ? 1 : 0;
     $is_popular = isset($_POST['is_popular']) ? 1 : 0;
     
-    // Handle image upload
+    // Handle image upload to Cloudinary
     $image_url = $_POST['existing_image'] ?? null;
     if (isset($_FILES['image']) && $_FILES['image']['error'] !== UPLOAD_ERR_NO_FILE) {
-        $uploaded_image = uploadImage($_FILES['image'], $upload_dir);
+        $uploaded_image = uploadToCloudinary($_FILES['image']);
         if ($uploaded_image === false) {
-            $error = "Invalid file type. Please upload JPG, PNG, GIF, or WEBP images only.";
+            $error = "Invalid file type. Please upload JPG, PNG, GIF, or WEBP images only. Max size: 5MB";
         } elseif ($uploaded_image) {
             $image_url = $uploaded_image;
+        } elseif ($uploaded_image === null) {
+            $error = "Upload failed. Please check your Cloudinary configuration and try again.";
         }
     }
     
@@ -86,20 +144,15 @@ if(($_SERVER['REQUEST_METHOD'] === 'POST') && in_array($action, ['add', 'edit'])
         $stmt->execute([$meal_id, $label_id]);
     }
     
-    header("Location: meals.php?message=" . urlencode($message));
-    exit();
+    if (empty($error)) {
+        header("Location: meals.php?message=" . urlencode($message));
+        exit();
+    }
 }
 
 // Handle Delete
 if($action == 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
-    // Get image path to delete file
-    $stmt = $pdo->prepare("SELECT image_url FROM meals WHERE id = ?");
-    $stmt->execute([$id]);
-    $meal = $stmt->fetch();
-    if ($meal && $meal['image_url'] && file_exists('..' . $meal['image_url'])) {
-        unlink('..' . $meal['image_url']);
-    }
     $pdo->prepare("DELETE FROM meal_dietary_labels WHERE meal_id = ?")->execute([$id]);
     $pdo->prepare("DELETE FROM meals WHERE id = ?")->execute([$id]);
     header("Location: meals.php?message=Meal deleted successfully");
@@ -201,7 +254,7 @@ if(isset($_GET['message'])): ?>
                     <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp" class="form-input" style="padding: 0.375rem;">
                     <?php if($meal && $meal['image_url']): ?>
                         <div class="mt-2">
-                            <img src="<?php echo $meal['image_url']; ?>" alt="Current image" style="max-width: 100px; max-height: 100px;" class="rounded border">
+                            <img src="<?php echo $meal['image_url']; ?>" alt="Current image" style="max-width: 100px; max-height: 100px; object-fit: cover;" class="rounded border">
                             <p class="text-xs text-gray-500 mt-1">Current image. Upload new to replace.</p>
                         </div>
                     <?php endif; ?>
@@ -274,7 +327,7 @@ if(isset($_GET['message'])): ?>
             <tbody>
                 <?php foreach($meals as $item): ?>
                     <tr>
-                        <td class="px-6 py-4">
+                        <td>
                             <?php if($item['image_url']): ?>
                                 <img src="<?php echo $item['image_url']; ?>" alt="<?php echo htmlspecialchars($item['name']); ?>" class="w-12 h-12 object-cover rounded">
                             <?php else: ?>
@@ -303,7 +356,7 @@ if(isset($_GET['message'])): ?>
                             <span class="<?php echo $item['availability'] ? 'badge-success' : 'badge-danger'; ?>">
                                 <?php echo $item['availability'] ? 'Available' : 'Unavailable'; ?>
                             </span>
-                         </td>
+                        </td>
                         <td class="action-buttons">
                             <a href="?action=toggle&id=<?php echo $item['id']; ?>" class="btn-secondary" style="padding: 0.25rem 0.5rem;">
                                 <i class="fas fa-toggle-<?php echo $item['availability'] ? 'on' : 'off'; ?>"></i>
@@ -311,7 +364,7 @@ if(isset($_GET['message'])): ?>
                             <a href="?action=edit&id=<?php echo $item['id']; ?>" class="btn-primary" style="padding: 0.25rem 0.5rem; background-color: #4f46e5;">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            <a href="?action=delete&id=<?php echo $item['id']; ?>" onclick="return confirm('Are you sure? This will also delete the image.')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
+                            <a href="?action=delete&id=<?php echo $item['id']; ?>" onclick="return confirm('Are you sure? This will delete the meal from your menu.')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
                                 <i class="fas fa-trash"></i>
                             </a>
                         </td>
