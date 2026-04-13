@@ -31,34 +31,36 @@ $page_title = $page_title ?? 'Admin Dashboard';
     <!-- Overlay -->
     <div class="overlay" onclick="toggleSidebar()"></div>
     
-    <!-- Sidebar -->
-    <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h2>Elga Cafe Admin</h2>
-            <p>Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?></p>
+    <!-- Admin Container - Flex container for desktop -->
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Elga Cafe Admin</h2>
+                <p>Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?></p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+                <a href="meals.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'meals.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-utensils"></i> Meals
+                </a>
+                <a href="categories.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'categories.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-tags"></i> Categories
+                </a>
+                <a href="dietary-labels.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'dietary-labels.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-leaf"></i> Dietary Labels
+                </a>
+                <a href="discounts.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'discounts.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-tag"></i> Discounts
+                </a>
+                <a href="logout.php" class="logout">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
         </div>
-        <nav class="sidebar-nav">
-            <a href="index.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>">
-                <i class="fas fa-tachometer-alt"></i> Dashboard
-            </a>
-            <a href="meals.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'meals.php' ? 'active' : ''; ?>">
-                <i class="fas fa-utensils"></i> Meals
-            </a>
-            <a href="categories.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'categories.php' ? 'active' : ''; ?>">
-                <i class="fas fa-tags"></i> Categories
-            </a>
-            <a href="dietary-labels.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'dietary-labels.php' ? 'active' : ''; ?>">
-                <i class="fas fa-leaf"></i> Dietary Labels
-            </a>
-            <a href="discounts.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'discounts.php' ? 'active' : ''; ?>">
-                <i class="fas fa-tag"></i> Discounts
-            </a>
-            <a href="logout.php" class="logout">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
-    </div>
-    
-    <!-- Main Content -->
-    <div class="main-content">
-        <div class="content-wrapper">
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="content-wrapper">
