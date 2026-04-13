@@ -25,4 +25,9 @@ try {
 date_default_timezone_set('UTC');
 define('SITE_NAME', 'Elga Cafe');
 define('DEBUG_MODE', false);
+// Add at the end of your config.php
+// Cloudinary configuration (from environment variables)
+define('CLOUDINARY_CLOUD_NAME', getenv('CLOUDINARY_CLOUD_NAME') ?: 'YOUR_CLOUD_NAME');
+define('CLOUDINARY_API_KEY', getenv('CLOUDINARY_API_KEY') ?: 'YOUR_API_KEY');
+define('CLOUDINARY_API_SECRET', getenv('CLOUDINARY_API_SECRET') ?: 'YOUR_API_SECRET');
 ?>
