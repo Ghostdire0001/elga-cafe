@@ -7,14 +7,13 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 $message = '';
 $error = '';
 
-// SIMPLIFIED Cloudinary upload function - using unsigned upload (no signature needed!)
+// Cloudinary upload function using unsigned preset (working version from test)
 function uploadToCloudinary($file) {
     $cloud_name = CLOUDINARY_CLOUD_NAME;
-    $api_key = CLOUDINARY_API_KEY;
-    $api_secret = CLOUDINARY_API_SECRET;
+    $upload_preset = 'elga_cafe_unsigned'; // The preset you created
     
-    if (empty($cloud_name) || empty($api_key) || empty($api_secret)) {
-        error_log("Cloudinary credentials missing");
+    if (empty($cloud_name)) {
+        error_log("Cloudinary cloud name missing");
         return null;
     }
     
@@ -38,53 +37,18 @@ function uploadToCloudinary($file) {
         return false;
     }
     
-    // Prepare timestamp and folder
-    $timestamp = time();
-    $folder = 'elga-cafe/meals';
-    $filename = pathinfo($file['name'], PATHINFO_FILENAME);
-    $safe_filename = preg_replace('/[^a-zA-Z0-9_-]/', '_', $filename);
-    $public_id = $folder . '/' . $safe_filename . '_' . $timestamp;
-    
-    // Read file and encode as base64
-    $image_data = base64_encode(file_get_contents($file['tmp_name']));
-    
-    // Prepare upload data WITHOUT signature (using unsigned upload with upload preset)
-    // First, we need to create an unsigned upload preset in Cloudinary dashboard
+    // Prepare upload data
     $upload_data = [
-        'file' => 'data:' . $mime_type . ';base64,' . $image_data,
-        'public_id' => $public_id,
-        'api_key' => $api_key,
-        'timestamp' => $timestamp,
+        'file' => curl_file_create($file['tmp_name'], $mime_type, $file['name']),
+        'upload_preset' => $upload_preset,
     ];
     
-    // Generate signature correctly - parameters in alphabetical order
-    $params = [
-        'api_key' => $api_key,
-        'public_id' => $public_id,
-        'timestamp' => $timestamp,
-    ];
-    
-    // Sort by key (already alphabetical)
-    ksort($params);
-    
-    // Build string to sign
-    $string_to_sign = '';
-    foreach ($params as $key => $value) {
-        $string_to_sign .= $key . '=' . $value . '&';
-    }
-    $string_to_sign = rtrim($string_to_sign, '&');
-    
-    // Generate signature
-    $signature = hash_hmac('sha256', $string_to_sign, $api_secret);
-    $upload_data['signature'] = $signature;
-    
-    // Send to Cloudinary
     $url = "https://api.cloudinary.com/v1_1/$cloud_name/image/upload";
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($upload_data));
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $upload_data);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
