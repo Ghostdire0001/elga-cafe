@@ -1,92 +1,86 @@
 <?php
-$page_title = 'Manage Dietary Labels';
+$page_title = 'Manage Categories';
 require_once '../includes/config.php';
-require_once 'includes/header.php';
 
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
-// Predefined icon options with display names and suggested colors
 $icon_options = [
-    'fa-leaf' => '🌿 Leaf (Vegetarian)',
-    'fa-wheat-slash' => '🚫🌾 Gluten-Free',
-    'fa-seedling' => '🌱 Seedling (Vegan)',
-    'fa-pepper-hot' => '🌶️ Hot Pepper (Spicy)',
-    'fa-cheese' => '🧀 Cheese (Dairy-Free)',
-    'fa-circle-exclamation' => '⚠️ Warning (Contains Nuts)',
-    'fa-chart-line' => '📈 Chart (Low Carb)',
-    'fa-egg' => '🥚 Egg',
+    'fa-utensils' => '🍽️ Utensils',
+    'fa-hamburger' => '🍔 Hamburger',
+    'fa-pizza-slice' => '🍕 Pizza',
     'fa-fish' => '🐟 Fish',
-    'fa-bacon' => '🥓 Bacon',
-    'fa-apple-alt' => '🍎 Apple (Organic)',
-    'fa-heart' => '❤️ Heart (Healthy)',
-    'fa-dove' => '🕊️ Dove (Halal)',
-    'fa-star-of-david' => '✡️ Star (Kosher)',
-];
-
-// Predefined color options
-$color_options = [
-    '#4CAF50' => 'Green (Vegetarian/Vegan)',
-    '#FF9800' => 'Orange (Gluten-Free)',
-    '#F44336' => 'Red (Spicy/Allergen)',
-    '#2196F3' => 'Blue (Dairy-Free)',
-    '#9C27B0' => 'Purple (Nuts)',
-    '#00BCD4' => 'Cyan (Low Carb)',
-    '#795548' => 'Brown (Organic)',
-    '#E91E63' => 'Pink (Sweet)',
-    '#607D8B' => 'Blue Grey (Seafood)',
-    '#8BC34A' => 'Light Green (Healthy)',
+    'fa-carrot' => '🥕 Carrot',
+    'fa-apple-alt' => '🍎 Apple',
+    'fa-coffee' => '☕ Coffee',
+    'fa-mug-hot' => '🍵 Hot Mug',
+    'fa-wine-glass-alt' => '🍷 Wine Glass',
+    'fa-cocktail' => '🍹 Cocktail',
+    'fa-ice-cream' => '🍦 Ice Cream',
+    'fa-cake-candles' => '🎂 Cake',
+    'fa-bread-slice' => '🍞 Bread',
+    'fa-cheese' => '🧀 Cheese',
+    'fa-egg' => '🥚 Egg',
+    'fa-pepper-hot' => '🌶️ Hot Pepper',
+    'fa-leaf' => '🌿 Leaf',
+    'fa-seedling' => '🌱 Seedling',
+    'fa-bowl-food' => '🥣 Bowl',
+    'fa-plate-wheat' => '🍽️ Plate',
 ];
 
 // Handle Add/Edit
 if($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['add', 'edit'])) {
     $name = strtolower(trim($_POST['name']));
+    $description = trim($_POST['description']);
     $icon_class = trim($_POST['icon_class']);
-    $color_hex = trim($_POST['color_hex']);
+    $is_active = isset($_POST['is_active']) ? 1 : 0;
     
     if($action == 'add') {
-        $stmt = $pdo->prepare("INSERT INTO dietary_labels (name, icon_class, color_hex) VALUES (?, ?, ?)");
-        $stmt->execute([$name, $icon_class, $color_hex]);
-        $message = "Dietary label added successfully!";
+        $stmt = $pdo->query("SELECT MAX(display_order) as max_order FROM categories");
+        $result = $stmt->fetch();
+        $display_order = ($result['max_order'] ?? 0) + 1;
+        
+        $stmt = $pdo->prepare("INSERT INTO categories (name, description, icon_class, display_order, is_active) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $description, $icon_class, $display_order, $is_active]);
+        $message = "Category added successfully!";
     } else {
-        $id = intval($_POST['label_id']);
-        $stmt = $pdo->prepare("UPDATE dietary_labels SET name=?, icon_class=?, color_hex=? WHERE id=?");
-        $stmt->execute([$name, $icon_class, $color_hex, $id]);
-        $message = "Dietary label updated successfully!";
+        $id = intval($_POST['category_id']);
+        $stmt = $pdo->prepare("UPDATE categories SET name=?, description=?, icon_class=?, is_active=? WHERE id=?");
+        $stmt->execute([$name, $description, $icon_class, $is_active, $id]);
+        $message = "Category updated successfully!";
     }
-    header("Location: dietary-labels.php?message=" . urlencode($message));
+    header("Location: categories.php?message=" . urlencode($message));
     exit();
 }
 
 // Handle Delete
 if($action == 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM meal_dietary_labels WHERE dietary_label_id = ?");
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM meals WHERE category_id = ?");
     $stmt->execute([$id]);
-    $usage_count = $stmt->fetchColumn();
+    $meal_count = $stmt->fetchColumn();
     
-    if($usage_count > 0) {
-        $message = "Cannot delete label that is used by meals. Remove it from meals first.";
-        header("Location: dietary-labels.php?error=" . urlencode($message));
+    if($meal_count > 0) {
+        $message = "Cannot delete category with existing meals. Move or delete meals first.";
+        header("Location: categories.php?error=" . urlencode($message));
     } else {
-        $pdo->prepare("DELETE FROM dietary_labels WHERE id = ?")->execute([$id]);
-        header("Location: dietary-labels.php?message=Dietary label deleted successfully");
+        $pdo->prepare("DELETE FROM categories WHERE id = ?")->execute([$id]);
+        header("Location: categories.php?message=Category deleted successfully");
     }
     exit();
 }
 
-// Get label for edit
-$label = null;
+require_once 'includes/header.php';
+
+$category = null;
 if($action == 'edit' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
-    $stmt = $pdo->prepare("SELECT * FROM dietary_labels WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT * FROM categories WHERE id = ?");
     $stmt->execute([$id]);
-    $label = $stmt->fetch();
+    $category = $stmt->fetch();
 }
 
-// Get all labels
-$labels = $pdo->query("SELECT * FROM dietary_labels ORDER BY name ASC")->fetchAll();
+$categories = $pdo->query("SELECT * FROM categories ORDER BY display_order ASC")->fetchAll();
 
-// Display messages
 if(isset($_GET['message'])): ?>
     <div class="alert-success"><?php echo htmlspecialchars($_GET['message']); ?></div>
 <?php endif; ?>
@@ -95,27 +89,26 @@ if(isset($_GET['message'])): ?>
 <?php endif; ?>
 
 <div class="page-header">
-    <h1 class="page-title">Manage Dietary Labels</h1>
+    <h1 class="page-title">Manage Categories</h1>
     <a href="?action=add" class="btn-success">
-        <i class="fas fa-plus"></i> Add Label
+        <i class="fas fa-plus"></i> Add Category
     </a>
 </div>
 
-<?php if($action == 'add' || ($action == 'edit' && $label)): ?>
+<?php if($action == 'add' || ($action == 'edit' && $category)): ?>
     <div class="form-container">
-        <h2 class="text-xl font-bold mb-4"><?php echo $action == 'add' ? 'Add Dietary Label' : 'Edit Dietary Label'; ?></h2>
+        <h2 class="text-xl font-bold mb-4"><?php echo $action == 'add' ? 'Add Category' : 'Edit Category'; ?></h2>
         <form method="POST" action="">
             <?php if($action == 'edit'): ?>
-                <input type="hidden" name="label_id" value="<?php echo $label['id']; ?>">
+                <input type="hidden" name="category_id" value="<?php echo $category['id']; ?>">
             <?php endif; ?>
             
             <div class="form-grid">
                 <div class="form-group">
-                    <label class="form-label">Label Name *</label>
-                    <input type="text" name="name" required value="<?php echo $label ? ucfirst($label['name']) : ''; ?>" 
-                           placeholder="e.g., vegetarian, gluten-free, vegan, spicy"
+                    <label class="form-label">Name *</label>
+                    <input type="text" name="name" required value="<?php echo $category ? ucfirst($category['name']) : ''; ?>" 
+                           placeholder="e.g., Appetizers, Mains, Desserts"
                            class="form-input">
-                    <p class="text-xs text-gray-500 mt-1">Use lowercase, hyphens instead of spaces (e.g., gluten-free)</p>
                 </div>
                 
                 <div class="form-group">
@@ -123,128 +116,77 @@ if(isset($_GET['message'])): ?>
                     <select name="icon_class" required class="form-select">
                         <option value="">Select an icon...</option>
                         <?php foreach($icon_options as $icon_value => $icon_label): ?>
-                            <option value="<?php echo $icon_value; ?>" <?php echo ($label && $label['icon_class'] == $icon_value) ? 'selected' : ''; ?>>
+                            <option value="<?php echo $icon_value; ?>" <?php echo ($category && $category['icon_class'] == $icon_value) ? 'selected' : ''; ?>>
                                 <?php echo $icon_label; ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <p class="text-xs text-gray-500 mt-1">Choose an icon that represents this dietary label</p>
+                    <p class="text-xs text-gray-500 mt-1">Choose an icon that represents this category</p>
+                </div>
+                
+                <div class="form-group full-width">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" rows="3" class="form-textarea" 
+                              placeholder="Describe what this category offers..."><?php echo $category ? htmlspecialchars($category['description']) : ''; ?></textarea>
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">Color *</label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <select name="color_hex" id="color_select" class="form-select">
-                            <option value="">Select a color...</option>
-                            <?php foreach($color_options as $color_value => $color_label): ?>
-                                <option value="<?php echo $color_value; ?>" <?php echo ($label && $label['color_hex'] == $color_value) ? 'selected' : ''; ?> 
-                                        style="background-color: <?php echo $color_value; ?>20; color: <?php echo $color_value; ?>;">
-                                    <?php echo $color_label; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <div class="flex items-center gap-2">
-                            <input type="color" name="color_hex_custom" id="color_custom" 
-                                   value="<?php echo $label ? $label['color_hex'] : '#4CAF50'; ?>" 
-                                   class="w-12 h-10 border border-gray-300 rounded cursor-pointer">
-                            <input type="text" name="color_hex" id="color_hex" 
-                                   value="<?php echo $label ? $label['color_hex'] : '#4CAF50'; ?>" 
-                                   class="form-input flex-1" placeholder="#RRGGBB">
-                        </div>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">Choose a color or pick a custom one using the color picker</p>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="is_active" <?php echo ($category && $category['is_active']) || !$category ? 'checked' : ''; ?>>
+                        Active (show on menu)
+                    </label>
                 </div>
             </div>
             
             <div class="mt-6 flex gap-2">
                 <button type="submit" class="btn-primary">
-                    <i class="fas fa-save"></i> <?php echo $action == 'add' ? 'Save Label' : 'Update Label'; ?>
+                    <i class="fas fa-save"></i> <?php echo $action == 'add' ? 'Save Category' : 'Update Category'; ?>
                 </button>
-                <a href="dietary-labels.php" class="btn-secondary">Cancel</a>
+                <a href="categories.php" class="btn-secondary">Cancel</a>
             </div>
         </form>
     </div>
-    
-    <script>
-        // Sync color inputs
-        const colorSelect = document.getElementById('color_select');
-        const colorCustom = document.getElementById('color_custom');
-        const colorHex = document.getElementById('color_hex');
-        
-        function updateColor(value) {
-            colorHex.value = value;
-            colorCustom.value = value;
-        }
-        
-        colorSelect.addEventListener('change', function() {
-            if (this.value) {
-                updateColor(this.value);
-            }
-        });
-        
-        colorCustom.addEventListener('change', function() {
-            updateColor(this.value);
-            colorSelect.value = '';
-        });
-        
-        colorHex.addEventListener('input', function() {
-            if (this.value.match(/^#[0-9A-Fa-f]{6}$/)) {
-                updateColor(this.value);
-                colorSelect.value = '';
-            }
-        });
-    </script>
 <?php else: ?>
     <div class="table-container">
         <table class="admin-table">
             <thead>
                 <tr>
+                    <th>Order</th>
                     <th>Icon</th>
                     <th>Name</th>
-                    <th>Color</th>
-                    <th>Preview</th>
+                    <th>Description</th>
+                    <th>Status</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach($labels as $item): ?>
+                <?php 
+                $order = 1;
+                foreach($categories as $cat): 
+                ?>
                     <tr>
-                        <td><i class="fas <?php echo $item['icon_class']; ?> text-xl" style="color: <?php echo $item['color_hex']; ?>"></i></td>
+                        <td><?php echo $order++; ?></td>
+                        <td><i class="fas <?php echo $cat['icon_class']; ?> text-orange-custom text-xl"></i></td>
                         <td>
-                            <div class="font-semibold text-gray-900"><?php echo ucfirst($item['name']); ?></div>
-                            <div class="text-xs text-gray-500 mt-1"><?php echo $item['icon_class']; ?></div>
+                            <div class="font-semibold text-gray-900"><?php echo ucfirst($cat['name']); ?></div>
+                            <div class="text-xs text-gray-500 mt-1"><?php echo $cat['icon_class']; ?></div>
                         </td>
+                        <td><?php echo htmlspecialchars(substr($cat['description'], 0, 50)) . (strlen($cat['description']) > 50 ? '...' : ''); ?></td>
                         <td>
-                            <div class="flex items-center gap-2">
-                                <div class="w-6 h-6 rounded border" style="background-color: <?php echo $item['color_hex']; ?>"></div>
-                                <span class="text-xs font-mono"><?php echo $item['color_hex']; ?></span>
-                            </div>
-                        </td>
-                        <td>
-                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs" 
-                                  style="background-color: <?php echo $item['color_hex']; ?>20; color: <?php echo $item['color_hex']; ?>">
-                                <i class="fas <?php echo $item['icon_class']; ?>"></i>
-                                <?php echo ucfirst($item['name']); ?>
+                            <span class="<?php echo $cat['is_active'] ? 'badge-success' : 'badge-danger'; ?>">
+                                <?php echo $cat['is_active'] ? 'Active' : 'Inactive'; ?>
                             </span>
                         </td>
                         <td class="action-buttons">
-                            <a href="?action=edit&id=<?php echo $item['id']; ?>" class="btn-primary" style="padding: 0.25rem 0.5rem; background-color: #4f46e5;">
+                            <a href="?action=edit&id=<?php echo $cat['id']; ?>" class="btn-primary" style="padding: 0.25rem 0.5rem; background-color: #4f46e5;">
                                 <i class="fas fa-edit"></i> Edit
                             </a>
-                            <a href="?action=delete&id=<?php echo $item['id']; ?>" onclick="return confirm('Are you sure? This label will be removed from all meals.')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
+                            <a href="?action=delete&id=<?php echo $cat['id']; ?>" onclick="return confirm('Are you sure?')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
                                 <i class="fas fa-trash"></i> Delete
                             </a>
                         </td>
                     </tr>
                 <?php endforeach; ?>
-                <?php if(empty($labels)): ?>
-                    <tr>
-                        <td colspan="5" class="text-center py-8 text-gray-500">
-                            <i class="fas fa-tags text-4xl mb-2 block"></i>
-                            No dietary labels yet. Click "Add Label" to create one.
-                        </td>
-                    </tr>
-                <?php endif; ?>
             </tbody>
         </table>
     </div>
