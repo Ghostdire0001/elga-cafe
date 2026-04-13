@@ -5,22 +5,50 @@ require_once 'includes/header.php';
 
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
+// Predefined icon options with display names
+$icon_options = [
+    'fa-utensils' => '🍽️ Utensils',
+    'fa-hamburger' => '🍔 Hamburger',
+    'fa-pizza-slice' => '🍕 Pizza',
+    'fa-fish' => '🐟 Fish',
+    'fa-carrot' => '🥕 Carrot',
+    'fa-apple-alt' => '🍎 Apple',
+    'fa-coffee' => '☕ Coffee',
+    'fa-mug-hot' => '🍵 Hot Mug',
+    'fa-wine-glass-alt' => '🍷 Wine Glass',
+    'fa-cocktail' => '🍹 Cocktail',
+    'fa-ice-cream' => '🍦 Ice Cream',
+    'fa-cake-candles' => '🎂 Cake',
+    'fa-bread-slice' => '🍞 Bread',
+    'fa-cheese' => '🧀 Cheese',
+    'fa-egg' => '🥚 Egg',
+    'fa-pepper-hot' => '🌶️ Hot Pepper',
+    'fa-leaf' => '🌿 Leaf',
+    'fa-seedling' => '🌱 Seedling',
+    'fa-bowl-food' => '🥣 Bowl',
+    'fa-plate-wheat' => '🍽️ Plate',
+];
+
 // Handle Add/Edit
 if($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['add', 'edit'])) {
     $name = strtolower(trim($_POST['name']));
     $description = trim($_POST['description']);
     $icon_class = trim($_POST['icon_class']);
-    $display_order = intval($_POST['display_order']);
     $is_active = isset($_POST['is_active']) ? 1 : 0;
     
     if($action == 'add') {
+        // Get the highest display order and add +1
+        $stmt = $pdo->query("SELECT MAX(display_order) as max_order FROM categories");
+        $result = $stmt->fetch();
+        $display_order = ($result['max_order'] ?? 0) + 1;
+        
         $stmt = $pdo->prepare("INSERT INTO categories (name, description, icon_class, display_order, is_active) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$name, $description, $icon_class, $display_order, $is_active]);
         $message = "Category added successfully!";
     } else {
         $id = intval($_POST['category_id']);
-        $stmt = $pdo->prepare("UPDATE categories SET name=?, description=?, icon_class=?, display_order=?, is_active=? WHERE id=?");
-        $stmt->execute([$name, $description, $icon_class, $display_order, $is_active, $id]);
+        $stmt = $pdo->prepare("UPDATE categories SET name=?, description=?, icon_class=?, is_active=? WHERE id=?");
+        $stmt->execute([$name, $description, $icon_class, $is_active, $id]);
         $message = "Category updated successfully!";
     }
     header("Location: categories.php?message=" . urlencode($message));
@@ -53,8 +81,8 @@ if($action == 'edit' && isset($_GET['id'])) {
     $category = $stmt->fetch();
 }
 
-// Get all categories
-$categories = $pdo->query("SELECT * FROM categories ORDER BY display_order")->fetchAll();
+// Get all categories ordered by display_order (newest last, oldest first)
+$categories = $pdo->query("SELECT * FROM categories ORDER BY display_order ASC")->fetchAll();
 
 // Display messages
 if(isset($_GET['message'])): ?>
@@ -82,29 +110,34 @@ if(isset($_GET['message'])): ?>
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label">Name *</label>
-                    <input type="text" name="name" required value="<?php echo $category ? ucfirst($category['name']) : ''; ?>" class="form-input">
+                    <input type="text" name="name" required value="<?php echo $category ? ucfirst($category['name']) : ''; ?>" 
+                           placeholder="e.g., Appetizers, Mains, Desserts"
+                           class="form-input">
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">Icon Class (Font Awesome)</label>
-                    <input type="text" name="icon_class" value="<?php echo $category ? $category['icon_class'] : 'fa-utensils'; ?>" placeholder="fa-utensils" class="form-input">
-                    <p class="text-xs text-gray-500 mt-1">Example: fa-utensils, fa-hamburger, fa-coffee</p>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Display Order</label>
-                    <input type="number" name="display_order" value="<?php echo $category ? $category['display_order'] : '0'; ?>" class="form-input">
+                    <label class="form-label">Icon *</label>
+                    <select name="icon_class" required class="form-select">
+                        <option value="">Select an icon...</option>
+                        <?php foreach($icon_options as $icon_value => $icon_label): ?>
+                            <option value="<?php echo $icon_value; ?>" <?php echo ($category && $category['icon_class'] == $icon_value) ? 'selected' : ''; ?>>
+                                <?php echo $icon_label; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Choose an icon that represents this category</p>
                 </div>
                 
                 <div class="form-group full-width">
                     <label class="form-label">Description</label>
-                    <textarea name="description" rows="3" class="form-textarea"><?php echo $category ? htmlspecialchars($category['description']) : ''; ?></textarea>
+                    <textarea name="description" rows="3" class="form-textarea" 
+                              placeholder="Describe what this category offers..."><?php echo $category ? htmlspecialchars($category['description']) : ''; ?></textarea>
                 </div>
                 
                 <div class="form-group">
                     <label class="checkbox-label">
                         <input type="checkbox" name="is_active" <?php echo ($category && $category['is_active']) || !$category ? 'checked' : ''; ?>>
-                        Active
+                        Active (show on menu)
                     </label>
                 </div>
             </div>
@@ -125,16 +158,24 @@ if(isset($_GET['message'])): ?>
                     <th>Order</th>
                     <th>Icon</th>
                     <th>Name</th>
+                    <th>Description</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach($categories as $cat): ?>
+                <?php 
+                $order = 1;
+                foreach($categories as $cat): 
+                ?>
                     <tr>
-                        <td><?php echo $cat['display_order']; ?></td>
-                        <td><i class="fas <?php echo $cat['icon_class']; ?> text-orange-custom"></i></td>
-                        <td><strong><?php echo ucfirst($cat['name']); ?></strong></td>
+                        <td><?php echo $order++; ?></td>
+                        <td><i class="fas <?php echo $cat['icon_class']; ?> text-orange-custom text-xl"></i></td>
+                        <td>
+                            <div class="font-semibold text-gray-900"><?php echo ucfirst($cat['name']); ?></div>
+                            <div class="text-xs text-gray-500 mt-1"><?php echo $cat['icon_class']; ?></div>
+                        </td>
+                        <td><?php echo htmlspecialchars(substr($cat['description'], 0, 50)) . (strlen($cat['description']) > 50 ? '...' : ''); ?></td>
                         <td>
                             <span class="<?php echo $cat['is_active'] ? 'badge-success' : 'badge-danger'; ?>">
                                 <?php echo $cat['is_active'] ? 'Active' : 'Inactive'; ?>
@@ -142,16 +183,24 @@ if(isset($_GET['message'])): ?>
                         </td>
                         <td class="action-buttons">
                             <a href="?action=edit&id=<?php echo $cat['id']; ?>" class="btn-primary" style="padding: 0.25rem 0.5rem; background-color: #4f46e5;">
-                                <i class="fas fa-edit"></i>
+                                <i class="fas fa-edit"></i> Edit
                             </a>
-                            <a href="?action=delete&id=<?php echo $cat['id']; ?>" onclick="return confirm('Are you sure?')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
-                                <i class="fas fa-trash"></i>
+                            <a href="?action=delete&id=<?php echo $cat['id']; ?>" onclick="return confirm('Are you sure? This will also delete all meals in this category.')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
+                                <i class="fas fa-trash"></i> Delete
                             </a>
                         </td>
                     </tr>
                 <?php endforeach; ?>
+                <?php if(empty($categories)): ?>
+                    <tr>
+                        <td colspan="6" class="text-center py-8 text-gray-500">
+                            <i class="fas fa-folder-open text-4xl mb-2 block"></i>
+                            No categories yet. Click "Add Category" to create one.
+                        </td>
+                    </tr>
+                <?php endif; ?>
             </tbody>
-        </table>
+         </table>
     </div>
 <?php endif; ?>
 
