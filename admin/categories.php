@@ -1,11 +1,9 @@
 <?php
 $page_title = 'Manage Categories';
 require_once '../includes/config.php';
-require_once 'includes/header.php';
 
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
-// Predefined icon options with display names
 $icon_options = [
     'fa-utensils' => '🍽️ Utensils',
     'fa-hamburger' => '🍔 Hamburger',
@@ -37,7 +35,6 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['add', 'edit'])) 
     $is_active = isset($_POST['is_active']) ? 1 : 0;
     
     if($action == 'add') {
-        // Get the highest display order and add +1
         $stmt = $pdo->query("SELECT MAX(display_order) as max_order FROM categories");
         $result = $stmt->fetch();
         $display_order = ($result['max_order'] ?? 0) + 1;
@@ -72,7 +69,8 @@ if($action == 'delete' && isset($_GET['id'])) {
     exit();
 }
 
-// Get category for edit
+require_once 'includes/header.php';
+
 $category = null;
 if($action == 'edit' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
@@ -81,10 +79,8 @@ if($action == 'edit' && isset($_GET['id'])) {
     $category = $stmt->fetch();
 }
 
-// Get all categories ordered by display_order (newest last, oldest first)
 $categories = $pdo->query("SELECT * FROM categories ORDER BY display_order ASC")->fetchAll();
 
-// Display messages
 if(isset($_GET['message'])): ?>
     <div class="alert-success"><?php echo htmlspecialchars($_GET['message']); ?></div>
 <?php endif; ?>
@@ -185,22 +181,14 @@ if(isset($_GET['message'])): ?>
                             <a href="?action=edit&id=<?php echo $cat['id']; ?>" class="btn-primary" style="padding: 0.25rem 0.5rem; background-color: #4f46e5;">
                                 <i class="fas fa-edit"></i> Edit
                             </a>
-                            <a href="?action=delete&id=<?php echo $cat['id']; ?>" onclick="return confirm('Are you sure? This will also delete all meals in this category.')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
+                            <a href="?action=delete&id=<?php echo $cat['id']; ?>" onclick="return confirm('Are you sure?')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
                                 <i class="fas fa-trash"></i> Delete
                             </a>
                         </td>
                     </tr>
                 <?php endforeach; ?>
-                <?php if(empty($categories)): ?>
-                    <tr>
-                        <td colspan="6" class="text-center py-8 text-gray-500">
-                            <i class="fas fa-folder-open text-4xl mb-2 block"></i>
-                            No categories yet. Click "Add Category" to create one.
-                        </td>
-                    </tr>
-                <?php endif; ?>
             </tbody>
-         </table>
+        </table>
     </div>
 <?php endif; ?>
 
