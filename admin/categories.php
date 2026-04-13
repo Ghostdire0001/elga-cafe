@@ -61,4 +61,98 @@ if(isset($_GET['message'])): ?>
     <div class="alert-success"><?php echo htmlspecialchars($_GET['message']); ?></div>
 <?php endif; ?>
 <?php if(isset($_GET['error'])): ?>
-    <div class="alert-error"><?php echo htmlspecialchars($_GET['error']);
+    <div class="alert-error"><?php echo htmlspecialchars($_GET['error']); ?></div>
+<?php endif; ?>
+
+<div class="page-header">
+    <h1 class="page-title">Manage Categories</h1>
+    <a href="?action=add" class="btn-success">
+        <i class="fas fa-plus"></i> Add Category
+    </a>
+</div>
+
+<?php if($action == 'add' || ($action == 'edit' && $category)): ?>
+    <div class="form-container">
+        <h2 class="text-xl font-bold mb-4"><?php echo $action == 'add' ? 'Add Category' : 'Edit Category'; ?></h2>
+        <form method="POST" action="">
+            <?php if($action == 'edit'): ?>
+                <input type="hidden" name="category_id" value="<?php echo $category['id']; ?>">
+            <?php endif; ?>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Name *</label>
+                    <input type="text" name="name" required value="<?php echo $category ? ucfirst($category['name']) : ''; ?>" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Icon Class (Font Awesome)</label>
+                    <input type="text" name="icon_class" value="<?php echo $category ? $category['icon_class'] : 'fa-utensils'; ?>" placeholder="fa-utensils" class="form-input">
+                    <p class="text-xs text-gray-500 mt-1">Example: fa-utensils, fa-hamburger, fa-coffee</p>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Display Order</label>
+                    <input type="number" name="display_order" value="<?php echo $category ? $category['display_order'] : '0'; ?>" class="form-input">
+                </div>
+                
+                <div class="form-group full-width">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" rows="3" class="form-textarea"><?php echo $category ? htmlspecialchars($category['description']) : ''; ?></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="is_active" <?php echo ($category && $category['is_active']) || !$category ? 'checked' : ''; ?>>
+                        Active
+                    </label>
+                </div>
+            </div>
+            
+            <div class="mt-6 flex gap-2">
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-save"></i> <?php echo $action == 'add' ? 'Save Category' : 'Update Category'; ?>
+                </button>
+                <a href="categories.php" class="btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+<?php else: ?>
+    <div class="table-container">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Order</th>
+                    <th>Icon</th>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach($categories as $cat): ?>
+                    <tr>
+                        <td><?php echo $cat['display_order']; ?></td>
+                        <td><i class="fas <?php echo $cat['icon_class']; ?> text-orange-custom"></i></td>
+                        <td><strong><?php echo ucfirst($cat['name']); ?></strong></td>
+                        <td>
+                            <span class="<?php echo $cat['is_active'] ? 'badge-success' : 'badge-danger'; ?>">
+                                <?php echo $cat['is_active'] ? 'Active' : 'Inactive'; ?>
+                            </span>
+                        </td>
+                        <td class="action-buttons">
+                            <a href="?action=edit&id=<?php echo $cat['id']; ?>" class="btn-primary" style="padding: 0.25rem 0.5rem; background-color: #4f46e5;">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="?action=delete&id=<?php echo $cat['id']; ?>" onclick="return confirm('Are you sure?')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+<?php endif; ?>
+
+<?php require_once 'includes/footer.php'; ?>
