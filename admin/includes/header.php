@@ -2,17 +2,12 @@
 if(session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-
-// Check if user is logged in and has admin access
 if(!isset($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['admin', 'manager'])) {
     header('Location: login.php');
     exit();
 }
-
-// Set page title if not set
 $page_title = $page_title ?? 'Admin Dashboard';
-?>
-<!DOCTYPE html>
+?><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -23,17 +18,11 @@ $page_title = $page_title ?? 'Admin Dashboard';
     <link rel="stylesheet" href="../css/admin.css">
 </head>
 <body>
-    <!-- Mobile Menu Toggle Button -->
     <button class="menu-toggle" onclick="toggleSidebar()">
         <i class="fas fa-bars"></i>
     </button>
-    
-    <!-- Overlay -->
     <div class="overlay" onclick="toggleSidebar()"></div>
-    
-    <!-- Admin Container - Flex container for desktop -->
     <div class="admin-container">
-        <!-- Sidebar -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h2>Elga Cafe Admin</h2>
@@ -60,7 +49,5 @@ $page_title = $page_title ?? 'Admin Dashboard';
                 </a>
             </nav>
         </div>
-        
-        <!-- Main Content -->
         <div class="main-content">
             <div class="content-wrapper">
