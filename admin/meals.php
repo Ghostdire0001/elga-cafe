@@ -3,10 +3,41 @@ $page_title = 'Manage Meals';
 require_once '../includes/config.php';
 require_once 'includes/header.php';
 
-// Handle different actions
+// Create uploads directory if it doesn't exist
+$upload_dir = '../uploads/meals/';
+if (!file_exists($upload_dir)) {
+    mkdir($upload_dir, 0777, true);
+}
+
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
-$message = '';
-$error = '';
+
+// Helper function to upload image
+function uploadImage($file, $upload_dir) {
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        return null;
+    }
+    
+    // Validate file type
+    $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime_type = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+    
+    if (!in_array($mime_type, $allowed_types)) {
+        return false;
+    }
+    
+    // Generate unique filename
+    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+    $filename = uniqid() . '_' . time() . '.' . $extension;
+    $destination = $upload_dir . $filename;
+    
+    if (move_uploaded_file($file['tmp_name'], $destination)) {
+        return '/uploads/meals/' . $filename;
+    }
+    
+    return null;
+}
 
 // Handle Add/Edit Meal
 if(($_SERVER['REQUEST_METHOD'] === 'POST') && in_array($action, ['add', 'edit'])) {
@@ -19,7 +50,18 @@ if(($_SERVER['REQUEST_METHOD'] === 'POST') && in_array($action, ['add', 'edit'])
     $calories = !empty($_POST['calories']) ? intval($_POST['calories']) : null;
     $is_featured = isset($_POST['is_featured']) ? 1 : 0;
     $is_popular = isset($_POST['is_popular']) ? 1 : 0;
-    $image_url = !empty($_POST['image_url']) ? trim($_POST['image_url']) : null;
+    
+    // Handle image upload
+    $image_url = $_POST['existing_image'] ?? null;
+    if (isset($_FILES['image']) && $_FILES['image']['error'] !== UPLOAD_ERR_NO_FILE) {
+        $uploaded_image = uploadImage($_FILES['image'], $upload_dir);
+        if ($uploaded_image === false) {
+            $error = "Invalid file type. Please upload JPG, PNG, GIF, or WEBP images only.";
+        } elseif ($uploaded_image) {
+            $image_url = $uploaded_image;
+        }
+    }
+    
     $dietary_labels = isset($_POST['dietary_labels']) ? $_POST['dietary_labels'] : [];
     
     if($action == 'add') {
@@ -51,6 +93,13 @@ if(($_SERVER['REQUEST_METHOD'] === 'POST') && in_array($action, ['add', 'edit'])
 // Handle Delete
 if($action == 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
+    // Get image path to delete file
+    $stmt = $pdo->prepare("SELECT image_url FROM meals WHERE id = ?");
+    $stmt->execute([$id]);
+    $meal = $stmt->fetch();
+    if ($meal && $meal['image_url'] && file_exists('..' . $meal['image_url'])) {
+        unlink('..' . $meal['image_url']);
+    }
     $pdo->prepare("DELETE FROM meal_dietary_labels WHERE meal_id = ?")->execute([$id]);
     $pdo->prepare("DELETE FROM meals WHERE id = ?")->execute([$id]);
     header("Location: meals.php?message=Meal deleted successfully");
@@ -90,9 +139,12 @@ $meals = $pdo->query("SELECT m.*, c.name as category_name
                       LEFT JOIN categories c ON m.category_id = c.id 
                       ORDER BY m.id DESC")->fetchAll();
 
-// Display message
+// Display messages
 if(isset($_GET['message'])): ?>
     <div class="alert-success"><?php echo htmlspecialchars($_GET['message']); ?></div>
+<?php endif; ?>
+<?php if(isset($error)): ?>
+    <div class="alert-error"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
 
 <div class="page-header">
@@ -106,9 +158,10 @@ if(isset($_GET['message'])): ?>
     <!-- Add/Edit Form -->
     <div class="form-container">
         <h2 class="text-xl font-bold mb-4"><?php echo $action == 'add' ? 'Add New Meal' : 'Edit Meal'; ?></h2>
-        <form method="POST" action="">
+        <form method="POST" action="" enctype="multipart/form-data">
             <?php if($action == 'edit'): ?>
                 <input type="hidden" name="meal_id" value="<?php echo $meal['id']; ?>">
+                <input type="hidden" name="existing_image" value="<?php echo $meal['image_url']; ?>">
             <?php endif; ?>
             
             <div class="form-grid">
@@ -144,8 +197,15 @@ if(isset($_GET['message'])): ?>
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">Image URL</label>
-                    <input type="text" name="image_url" value="<?php echo $meal ? htmlspecialchars($meal['image_url']) : ''; ?>" placeholder="/images/meal-name.jpg" class="form-input">
+                    <label class="form-label">Meal Image</label>
+                    <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp" class="form-input" style="padding: 0.375rem;">
+                    <?php if($meal && $meal['image_url']): ?>
+                        <div class="mt-2">
+                            <img src="<?php echo $meal['image_url']; ?>" alt="Current image" style="max-width: 100px; max-height: 100px;" class="rounded border">
+                            <p class="text-xs text-gray-500 mt-1">Current image. Upload new to replace.</p>
+                        </div>
+                    <?php endif; ?>
+                    <p class="text-xs text-gray-500 mt-1">Allowed: JPG, PNG, GIF, WEBP. Max size: 5MB</p>
                 </div>
                 
                 <div class="form-group full-width">
@@ -173,7 +233,7 @@ if(isset($_GET['message'])): ?>
                     <label class="form-label">Status</label>
                     <div class="checkbox-group">
                         <label class="checkbox-label">
-                            <input type="checkbox" name="availability" <?php echo ($meal && $meal['availability']) ? 'checked' : 'checked'; ?>>
+                            <input type="checkbox" name="availability" <?php echo ($meal && $meal['availability']) || !$meal ? 'checked' : ''; ?>>
                             Available
                         </label>
                         <label class="checkbox-label">
@@ -202,6 +262,7 @@ if(isset($_GET['message'])): ?>
         <table class="admin-table">
             <thead>
                 <tr>
+                    <th>Image</th>
                     <th>ID</th>
                     <th>Name</th>
                     <th>Category</th>
@@ -213,6 +274,15 @@ if(isset($_GET['message'])): ?>
             <tbody>
                 <?php foreach($meals as $item): ?>
                     <tr>
+                        <td class="px-6 py-4">
+                            <?php if($item['image_url']): ?>
+                                <img src="<?php echo $item['image_url']; ?>" alt="<?php echo htmlspecialchars($item['name']); ?>" class="w-12 h-12 object-cover rounded">
+                            <?php else: ?>
+                                <div class="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
+                                    <i class="fas fa-utensils text-gray-400"></i>
+                                </div>
+                            <?php endif; ?>
+                        </td>
                         <td><?php echo $item['id']; ?></td>
                         <td>
                             <div class="font-medium text-gray-900"><?php echo htmlspecialchars($item['name']); ?></div>
@@ -233,7 +303,7 @@ if(isset($_GET['message'])): ?>
                             <span class="<?php echo $item['availability'] ? 'badge-success' : 'badge-danger'; ?>">
                                 <?php echo $item['availability'] ? 'Available' : 'Unavailable'; ?>
                             </span>
-                        </td>
+                         </td>
                         <td class="action-buttons">
                             <a href="?action=toggle&id=<?php echo $item['id']; ?>" class="btn-secondary" style="padding: 0.25rem 0.5rem;">
                                 <i class="fas fa-toggle-<?php echo $item['availability'] ? 'on' : 'off'; ?>"></i>
@@ -241,7 +311,7 @@ if(isset($_GET['message'])): ?>
                             <a href="?action=edit&id=<?php echo $item['id']; ?>" class="btn-primary" style="padding: 0.25rem 0.5rem; background-color: #4f46e5;">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            <a href="?action=delete&id=<?php echo $item['id']; ?>" onclick="return confirm('Are you sure?')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
+                            <a href="?action=delete&id=<?php echo $item['id']; ?>" onclick="return confirm('Are you sure? This will also delete the image.')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
                                 <i class="fas fa-trash"></i>
                             </a>
                         </td>
