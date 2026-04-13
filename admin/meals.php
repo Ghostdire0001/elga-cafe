@@ -1,7 +1,6 @@
 <?php
 $page_title = 'Manage Meals';
 require_once '../includes/config.php';
-require_once 'includes/header.php';
 
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 $message = '';
@@ -73,6 +72,8 @@ function uploadToCloudinary($file) {
     error_log("Cloudinary upload failed. HTTP: $http_code, Response: " . substr($response, 0, 500));
     return null;
 }
+
+require_once 'includes/header.php';
 
 // Handle POST request (Add/Edit) - MUST be BEFORE any output
 if(($_SERVER['REQUEST_METHOD'] === 'POST') && in_array($action, ['add', 'edit'])) {
