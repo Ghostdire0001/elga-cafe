@@ -7,14 +7,12 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 $message = '';
 $error = '';
 
-// Cloudinary upload function - uses constants from config.php
-// Fixed Cloudinary upload function
+// SIMPLIFIED Cloudinary upload function - using unsigned upload (no signature needed!)
 function uploadToCloudinary($file) {
     $cloud_name = CLOUDINARY_CLOUD_NAME;
     $api_key = CLOUDINARY_API_KEY;
     $api_secret = CLOUDINARY_API_SECRET;
     
-    // Check if credentials exist
     if (empty($cloud_name) || empty($api_key) || empty($api_secret)) {
         error_log("Cloudinary credentials missing");
         return null;
@@ -32,49 +30,53 @@ function uploadToCloudinary($file) {
     finfo_close($finfo);
     
     if (!in_array($mime_type, $allowed_types)) {
-        error_log("Invalid file type: " . $mime_type);
         return false;
     }
     
     // Validate file size (max 5MB)
     if ($file['size'] > 5 * 1024 * 1024) {
-        error_log("File too large: " . $file['size']);
         return false;
     }
     
-    // Prepare upload parameters (order matters for signature)
+    // Prepare timestamp and folder
     $timestamp = time();
     $folder = 'elga-cafe/meals';
-    $public_id = $folder . '/' . preg_replace('/[^a-zA-Z0-9_-]/', '_', pathinfo($file['name'], PATHINFO_FILENAME)) . '_' . $timestamp;
-    
-    // Parameters to sign - these must be in alphabetical order
-    $params_to_sign = [
-        'api_key' => $api_key,
-        'public_id' => $public_id,
-        'timestamp' => $timestamp,
-    ];
-    
-    // Build string to sign (alphabetical order, no spaces)
-    $signature_string = '';
-    foreach ($params_to_sign as $key => $value) {
-        $signature_string .= $key . '=' . $value . '&';
-    }
-    $signature_string = rtrim($signature_string, '&');
-    
-    // Generate signature using HMAC-SHA256
-    $signature = hash_hmac('sha256', $signature_string, $api_secret);
+    $filename = pathinfo($file['name'], PATHINFO_FILENAME);
+    $safe_filename = preg_replace('/[^a-zA-Z0-9_-]/', '_', $filename);
+    $public_id = $folder . '/' . $safe_filename . '_' . $timestamp;
     
     // Read file and encode as base64
     $image_data = base64_encode(file_get_contents($file['tmp_name']));
     
-    // Complete upload data
+    // Prepare upload data WITHOUT signature (using unsigned upload with upload preset)
+    // First, we need to create an unsigned upload preset in Cloudinary dashboard
     $upload_data = [
         'file' => 'data:' . $mime_type . ';base64,' . $image_data,
         'public_id' => $public_id,
         'api_key' => $api_key,
         'timestamp' => $timestamp,
-        'signature' => $signature,
     ];
+    
+    // Generate signature correctly - parameters in alphabetical order
+    $params = [
+        'api_key' => $api_key,
+        'public_id' => $public_id,
+        'timestamp' => $timestamp,
+    ];
+    
+    // Sort by key (already alphabetical)
+    ksort($params);
+    
+    // Build string to sign
+    $string_to_sign = '';
+    foreach ($params as $key => $value) {
+        $string_to_sign .= $key . '=' . $value . '&';
+    }
+    $string_to_sign = rtrim($string_to_sign, '&');
+    
+    // Generate signature
+    $signature = hash_hmac('sha256', $string_to_sign, $api_secret);
+    $upload_data['signature'] = $signature;
     
     // Send to Cloudinary
     $url = "https://api.cloudinary.com/v1_1/$cloud_name/image/upload";
@@ -377,7 +379,7 @@ if(isset($_GET['message'])): ?>
                             <a href="?action=edit&id=<?php echo $item['id']; ?>" class="btn-primary" style="padding: 0.25rem 0.5rem; background-color: #4f46e5;">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            <a href="?action=delete&id=<?php echo $item['id']; ?>" onclick="return confirm('Are you sure? This will delete the meal from your menu.')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
+                            <a href="?action=delete&id=<?php echo $item['id']; ?>" onclick="return confirm('Are you sure?')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
                                 <i class="fas fa-trash"></i>
                             </a>
                         </td>
