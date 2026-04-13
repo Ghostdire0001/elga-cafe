@@ -4,12 +4,12 @@ if(session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Database configuration
+// Database configuration - Get from environment variables
 $db_host = getenv('DB_HOST') ?: 'fhunzl.h.filess.io';
 $db_name = getenv('DB_NAME') ?: 'meal_menu_db_sometimego';
 $db_user = getenv('DB_USER') ?: 'meal_menu_db_sometimego';
 $db_pass = getenv('DB_PASS') ?: '238446391c2971f7d2668dd6be72bf408400ce26';
-$db_port = '3307';  // ← MAKE SURE THIS IS 3307, NOT 3306!
+$db_port = '3307';  // Use the correct port
 
 try {
     $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;port=$db_port", $db_user, $db_pass);
@@ -17,6 +17,7 @@ try {
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
     $pdo->exec("SET NAMES utf8mb4");
 } catch(PDOException $e) {
+    // Log error but don't show details in production
     error_log("Connection failed: " . $e->getMessage());
     die("Unable to connect to database. Please try again later.");
 }
