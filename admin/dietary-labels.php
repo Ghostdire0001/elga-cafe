@@ -5,6 +5,38 @@ require_once 'includes/header.php';
 
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
+// Predefined icon options with display names and suggested colors
+$icon_options = [
+    'fa-leaf' => '🌿 Leaf (Vegetarian)',
+    'fa-wheat-slash' => '🚫🌾 Gluten-Free',
+    'fa-seedling' => '🌱 Seedling (Vegan)',
+    'fa-pepper-hot' => '🌶️ Hot Pepper (Spicy)',
+    'fa-cheese' => '🧀 Cheese (Dairy-Free)',
+    'fa-circle-exclamation' => '⚠️ Warning (Contains Nuts)',
+    'fa-chart-line' => '📈 Chart (Low Carb)',
+    'fa-egg' => '🥚 Egg',
+    'fa-fish' => '🐟 Fish',
+    'fa-bacon' => '🥓 Bacon',
+    'fa-apple-alt' => '🍎 Apple (Organic)',
+    'fa-heart' => '❤️ Heart (Healthy)',
+    'fa-dove' => '🕊️ Dove (Halal)',
+    'fa-star-of-david' => '✡️ Star (Kosher)',
+];
+
+// Predefined color options
+$color_options = [
+    '#4CAF50' => 'Green (Vegetarian/Vegan)',
+    '#FF9800' => 'Orange (Gluten-Free)',
+    '#F44336' => 'Red (Spicy/Allergen)',
+    '#2196F3' => 'Blue (Dairy-Free)',
+    '#9C27B0' => 'Purple (Nuts)',
+    '#00BCD4' => 'Cyan (Low Carb)',
+    '#795548' => 'Brown (Organic)',
+    '#E91E63' => 'Pink (Sweet)',
+    '#607D8B' => 'Blue Grey (Seafood)',
+    '#8BC34A' => 'Light Green (Healthy)',
+];
+
 // Handle Add/Edit
 if($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['add', 'edit'])) {
     $name = strtolower(trim($_POST['name']));
@@ -52,7 +84,7 @@ if($action == 'edit' && isset($_GET['id'])) {
 }
 
 // Get all labels
-$labels = $pdo->query("SELECT * FROM dietary_labels ORDER BY id")->fetchAll();
+$labels = $pdo->query("SELECT * FROM dietary_labels ORDER BY name ASC")->fetchAll();
 
 // Display messages
 if(isset($_GET['message'])): ?>
@@ -79,22 +111,48 @@ if(isset($_GET['message'])): ?>
             
             <div class="form-grid">
                 <div class="form-group">
-                    <label class="form-label">Name *</label>
-                    <input type="text" name="name" required value="<?php echo $label ? ucfirst($label['name']) : ''; ?>" placeholder="vegetarian, gluten-free, vegan, etc." class="form-input">
+                    <label class="form-label">Label Name *</label>
+                    <input type="text" name="name" required value="<?php echo $label ? ucfirst($label['name']) : ''; ?>" 
+                           placeholder="e.g., vegetarian, gluten-free, vegan, spicy"
+                           class="form-input">
+                    <p class="text-xs text-gray-500 mt-1">Use lowercase, hyphens instead of spaces (e.g., gluten-free)</p>
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">Icon Class (Font Awesome)</label>
-                    <input type="text" name="icon_class" value="<?php echo $label ? $label['icon_class'] : 'fa-leaf'; ?>" placeholder="fa-leaf" class="form-input">
-                    <p class="text-xs text-gray-500 mt-1">Examples: fa-leaf, fa-wheat-slash, fa-pepper-hot</p>
+                    <label class="form-label">Icon *</label>
+                    <select name="icon_class" required class="form-select">
+                        <option value="">Select an icon...</option>
+                        <?php foreach($icon_options as $icon_value => $icon_label): ?>
+                            <option value="<?php echo $icon_value; ?>" <?php echo ($label && $label['icon_class'] == $icon_value) ? 'selected' : ''; ?>>
+                                <?php echo $icon_label; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Choose an icon that represents this dietary label</p>
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">Color (Hex)</label>
-                    <div class="flex items-center gap-2">
-                        <input type="color" name="color_hex" value="<?php echo $label ? $label['color_hex'] : '#4CAF50'; ?>" class="w-16 h-10 border border-gray-300 rounded">
-                        <input type="text" name="color_hex" value="<?php echo $label ? $label['color_hex'] : '#4CAF50'; ?>" class="form-input flex-1">
+                    <label class="form-label">Color *</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <select name="color_hex" id="color_select" class="form-select">
+                            <option value="">Select a color...</option>
+                            <?php foreach($color_options as $color_value => $color_label): ?>
+                                <option value="<?php echo $color_value; ?>" <?php echo ($label && $label['color_hex'] == $color_value) ? 'selected' : ''; ?> 
+                                        style="background-color: <?php echo $color_value; ?>20; color: <?php echo $color_value; ?>;">
+                                    <?php echo $color_label; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="flex items-center gap-2">
+                            <input type="color" name="color_hex_custom" id="color_custom" 
+                                   value="<?php echo $label ? $label['color_hex'] : '#4CAF50'; ?>" 
+                                   class="w-12 h-10 border border-gray-300 rounded cursor-pointer">
+                            <input type="text" name="color_hex" id="color_hex" 
+                                   value="<?php echo $label ? $label['color_hex'] : '#4CAF50'; ?>" 
+                                   class="form-input flex-1" placeholder="#RRGGBB">
+                        </div>
                     </div>
+                    <p class="text-xs text-gray-500 mt-1">Choose a color or pick a custom one using the color picker</p>
                 </div>
             </div>
             
@@ -106,40 +164,87 @@ if(isset($_GET['message'])): ?>
             </div>
         </form>
     </div>
+    
+    <script>
+        // Sync color inputs
+        const colorSelect = document.getElementById('color_select');
+        const colorCustom = document.getElementById('color_custom');
+        const colorHex = document.getElementById('color_hex');
+        
+        function updateColor(value) {
+            colorHex.value = value;
+            colorCustom.value = value;
+        }
+        
+        colorSelect.addEventListener('change', function() {
+            if (this.value) {
+                updateColor(this.value);
+            }
+        });
+        
+        colorCustom.addEventListener('change', function() {
+            updateColor(this.value);
+            colorSelect.value = '';
+        });
+        
+        colorHex.addEventListener('input', function() {
+            if (this.value.match(/^#[0-9A-Fa-f]{6}$/)) {
+                updateColor(this.value);
+                colorSelect.value = '';
+            }
+        });
+    </script>
 <?php else: ?>
     <div class="table-container">
         <table class="admin-table">
             <thead>
                 <tr>
-                    <th>ID</th>
                     <th>Icon</th>
                     <th>Name</th>
                     <th>Color</th>
+                    <th>Preview</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach($labels as $item): ?>
                     <tr>
-                        <td><?php echo $item['id']; ?></td>
-                        <td><i class="fas <?php echo $item['icon_class']; ?>" style="color: <?php echo $item['color_hex']; ?>"></i></td>
-                        <td><strong><?php echo ucfirst($item['name']); ?></strong></td>
+                        <td><i class="fas <?php echo $item['icon_class']; ?> text-xl" style="color: <?php echo $item['color_hex']; ?>"></i></td>
+                        <td>
+                            <div class="font-semibold text-gray-900"><?php echo ucfirst($item['name']); ?></div>
+                            <div class="text-xs text-gray-500 mt-1"><?php echo $item['icon_class']; ?></div>
+                        </td>
                         <td>
                             <div class="flex items-center gap-2">
                                 <div class="w-6 h-6 rounded border" style="background-color: <?php echo $item['color_hex']; ?>"></div>
-                                <span class="text-xs"><?php echo $item['color_hex']; ?></span>
+                                <span class="text-xs font-mono"><?php echo $item['color_hex']; ?></span>
                             </div>
+                        </td>
+                        <td>
+                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs" 
+                                  style="background-color: <?php echo $item['color_hex']; ?>20; color: <?php echo $item['color_hex']; ?>">
+                                <i class="fas <?php echo $item['icon_class']; ?>"></i>
+                                <?php echo ucfirst($item['name']); ?>
+                            </span>
                         </td>
                         <td class="action-buttons">
                             <a href="?action=edit&id=<?php echo $item['id']; ?>" class="btn-primary" style="padding: 0.25rem 0.5rem; background-color: #4f46e5;">
-                                <i class="fas fa-edit"></i>
+                                <i class="fas fa-edit"></i> Edit
                             </a>
-                            <a href="?action=delete&id=<?php echo $item['id']; ?>" onclick="return confirm('Are you sure?')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
-                                <i class="fas fa-trash"></i>
+                            <a href="?action=delete&id=<?php echo $item['id']; ?>" onclick="return confirm('Are you sure? This label will be removed from all meals.')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
+                                <i class="fas fa-trash"></i> Delete
                             </a>
                         </td>
                     </tr>
                 <?php endforeach; ?>
+                <?php if(empty($labels)): ?>
+                    <tr>
+                        <td colspan="5" class="text-center py-8 text-gray-500">
+                            <i class="fas fa-tags text-4xl mb-2 block"></i>
+                            No dietary labels yet. Click "Add Label" to create one.
+                        </td>
+                    </tr>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
