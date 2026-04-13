@@ -1,3 +1,4 @@
+            </div>
         </div>
     </div>
     
@@ -20,7 +21,7 @@
             });
         }
         
-        // Handle window resize
+        // Handle window resize - reset sidebar state
         window.addEventListener('resize', function() {
             if(window.innerWidth > 767) {
                 const sidebar = document.getElementById('sidebar');
