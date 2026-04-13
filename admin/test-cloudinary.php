@@ -72,17 +72,25 @@ function uploadToCloudinaryFixed($file) {
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($upload_data));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     
     $response = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_error = curl_error($ch);
     curl_close($ch);
+    
+    if ($curl_error) {
+        return "ERROR: CURL Error - " . $curl_error;
+    }
     
     if ($http_code === 200) {
         $result = json_decode($response, true);
-        return $result['secure_url'];
-    } else {
-        return "ERROR: HTTP $http_code - " . $response;
+        if (isset($result['secure_url'])) {
+            return $result['secure_url'];
+        }
     }
+    
+    return "ERROR: HTTP $http_code - " . $response;
 }
 
 if (isset($_FILES['test_image']) && $_FILES['test_image']['error'] === UPLOAD_ERR_OK) {
@@ -95,11 +103,21 @@ if (isset($_FILES['test_image']) && $_FILES['test_image']['error'] === UPLOAD_ER
     } else {
         echo "<p style='color:red'>✗ $result</p>";
     }
+} else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    echo "<p style='color:orange'>No file uploaded or upload error occurred.</p>";
 }
 ?>
 
 <h2>Test Upload Form</h2>
 <form method="POST" action="" enctype="multipart/form-data">
-    <input type="file" name="test_image" accept="image/jpeg,image/png,image/gif" required>
+    <input type="file" name="test_image" accept="image/jpeg,image/png,image/gif,image/webp" required>
     <button type="submit">Test Upload</button>
 </form>
+
+<h3>Current Cloudinary Configuration:</h3>
+<ul>
+    <li>Cloud Name: <?php echo defined('CLOUDINARY_CLOUD_NAME') ? CLOUDINARY_CLOUD_NAME : 'Not set'; ?></li>
+    <li>API Key: <?php echo defined('CLOUDINARY_API_KEY') ? substr(CLOUDINARY_API_KEY, 0, 10) . '...' : 'Not set'; ?></li>
+    <li>API Secret: <?php echo defined('CLOUDINARY_API_SECRET') ? '✓ Set (hidden)' : 'Not set'; ?></li>
+    <li>cURL installed: <?php echo function_exists('curl_version') ? '✓ Yes' : '✗ No'; ?></li>
+</ul>
