@@ -1,7 +1,8 @@
 <?php
-require_once '../includes/auth.php';
+$page_title = 'Manage Discounts';
+require_once '../includes/config.php';
+require_once 'includes/header.php';
 
-$message = '';
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
 // Handle Add/Edit
@@ -89,244 +90,189 @@ $discounts = $pdo->query("SELECT d.*,
                               ELSE 'Expired'
                           END as status
                           FROM discounts d ORDER BY d.created_at DESC")->fetchAll();
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Discounts - Elga Cafe Admin</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
-<body class="bg-gray-100">
-    <div class="flex h-screen">
-        <!-- Sidebar -->
-        <div class="w-64 bg-gray-800 text-white">
-            <div class="p-4">
-                <h2 class="text-xl font-bold">Elga Cafe Admin</h2>
-                <p class="text-sm text-gray-400">Welcome, <?php echo $_SESSION['username']; ?></p>
-            </div>
-            <nav class="mt-8">
-                <a href="index.php" class="block py-2 px-4 hover:bg-gray-700"><i class="fas fa-tachometer-alt mr-2"></i> Dashboard</a>
-                <a href="meals.php" class="block py-2 px-4 hover:bg-gray-700"><i class="fas fa-utensils mr-2"></i> Meals</a>
-                <a href="categories.php" class="block py-2 px-4 hover:bg-gray-700"><i class="fas fa-tags mr-2"></i> Categories</a>
-                <a href="dietary-labels.php" class="block py-2 px-4 hover:bg-gray-700"><i class="fas fa-leaf mr-2"></i> Dietary Labels</a>
-                <a href="discounts.php" class="block py-2 px-4 bg-orange-custom hover:bg-orange-600"><i class="fas fa-tag mr-2"></i> Discounts</a>
-                <a href="logout.php" class="block py-2 px-4 hover:bg-gray-700 mt-8"><i class="fas fa-sign-out-alt mr-2"></i> Logout</a>
-            </nav>
-        </div>
-        
-        <!-- Main Content -->
-        <div class="flex-1 overflow-y-auto">
-            <div class="p-8">
-                <?php if(isset($_GET['message'])): ?>
-                    <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4"><?php echo htmlspecialchars($_GET['message']); ?></div>
-                <?php endif; ?>
-                
-                <div class="flex justify-between items-center mb-6">
-                    <h1 class="text-3xl font-bold text-gray-800">Manage Discounts</h1>
-                    <a href="?action=add" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"><i class="fas fa-plus mr-2"></i> Add Discount</a>
+
+// Display messages
+if(isset($_GET['message'])): ?>
+    <div class="alert-success"><?php echo htmlspecialchars($_GET['message']); ?></div>
+<?php endif; ?>
+
+<div class="page-header">
+    <h1 class="page-title">Manage Discounts</h1>
+    <a href="?action=add" class="btn-success">
+        <i class="fas fa-plus"></i> Add Discount
+    </a>
+</div>
+
+<?php if($action == 'add' || ($action == 'edit' && $discount)): ?>
+    <div class="form-container">
+        <h2 class="text-xl font-bold mb-4"><?php echo $action == 'add' ? 'Add Discount' : 'Edit Discount'; ?></h2>
+        <form method="POST" action="" id="discountForm">
+            <?php if($action == 'edit'): ?>
+                <input type="hidden" name="discount_id" value="<?php echo $discount['id']; ?>">
+            <?php endif; ?>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Discount Code *</label>
+                    <input type="text" name="code" required value="<?php echo $discount ? $discount['code'] : ''; ?>" placeholder="WELCOME10" class="form-input">
                 </div>
                 
-                <?php if($action == 'add' || ($action == 'edit' && $discount)): ?>
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h2 class="text-xl font-bold mb-4"><?php echo $action == 'add' ? 'Add Discount' : 'Edit Discount'; ?></h2>
-                        <form method="POST" action="">
-                            <?php if($action == 'edit'): ?>
-                                <input type="hidden" name="discount_id" value="<?php echo $discount['id']; ?>">
-                            <?php endif; ?>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label class="block text-gray-700 font-bold mb-2">Discount Code *</label>
-                                    <input type="text" name="code" required value="<?php echo $discount ? $discount['code'] : ''; ?>" 
-                                           placeholder="WELCOME10"
-                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom">
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-gray-700 font-bold mb-2">Discount Name *</label>
-                                    <input type="text" name="name" required value="<?php echo $discount ? $discount['name'] : ''; ?>" 
-                                           placeholder="Welcome Discount"
-                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom">
-                                </div>
-                                
-                                <div class="md:col-span-2">
-                                    <label class="block text-gray-700 font-bold mb-2">Description</label>
-                                    <textarea name="description" rows="2" 
-                                              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom"><?php echo $discount ? htmlspecialchars($discount['description']) : ''; ?></textarea>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-gray-700 font-bold mb-2">Discount Type *</label>
-                                    <select name="discount_type" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom">
-                                        <option value="percentage" <?php echo ($discount && $discount['discount_type'] == 'percentage') ? 'selected' : ''; ?>>Percentage (%)</option>
-                                        <option value="fixed_amount" <?php echo ($discount && $discount['discount_type'] == 'fixed_amount') ? 'selected' : ''; ?>>Fixed Amount ($)</option>
-                                    </select>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-gray-700 font-bold mb-2">Discount Value *</label>
-                                    <input type="number" step="0.01" name="discount_value" required value="<?php echo $discount ? $discount['discount_value'] : ''; ?>" 
-                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom">
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-gray-700 font-bold mb-2">Start Date *</label>
-                                    <input type="datetime-local" name="start_date" required value="<?php echo $discount ? date('Y-m-d\TH:i', strtotime($discount['start_date'])) : ''; ?>" 
-                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom">
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-gray-700 font-bold mb-2">End Date *</label>
-                                    <input type="datetime-local" name="end_date" required value="<?php echo $discount ? date('Y-m-d\TH:i', strtotime($discount['end_date'])) : ''; ?>" 
-                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom">
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-gray-700 font-bold mb-2">Minimum Order Amount</label>
-                                    <input type="number" step="0.01" name="minimum_order_amount" value="<?php echo $discount ? $discount['minimum_order_amount'] : '0'; ?>" 
-                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom">
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-gray-700 font-bold mb-2">Maximum Discount Amount</label>
-                                    <input type="number" step="0.01" name="maximum_discount_amount" value="<?php echo $discount ? $discount['maximum_discount_amount'] : ''; ?>" 
-                                           placeholder="Optional"
-                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom">
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-gray-700 font-bold mb-2">Usage Limit</label>
-                                    <input type="number" name="usage_limit" value="<?php echo $discount ? $discount['usage_limit'] : ''; ?>" 
-                                           placeholder="Unlimited"
-                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom">
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-gray-700 font-bold mb-2">Applicable To *</label>
-                                    <select name="applicable_to" id="applicable_to" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom">
-                                        <option value="all" <?php echo ($discount && $discount['applicable_to'] == 'all') ? 'selected' : ''; ?>>All Meals</option>
-                                        <option value="specific_meals" <?php echo ($discount && $discount['applicable_to'] == 'specific_meals') ? 'selected' : ''; ?>>Specific Meals</option>
-                                        <option value="specific_categories" <?php echo ($discount && $discount['applicable_to'] == 'specific_categories') ? 'selected' : ''; ?>>Specific Categories</option>
-                                    </select>
-                                </div>
-                                
-                                <div id="specific_meals_div" style="display: none;" class="md:col-span-2">
-                                    <label class="block text-gray-700 font-bold mb-2">Select Meals</label>
-                                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                        <?php foreach($meals as $meal): ?>
-                                            <label class="inline-flex items-center">
-                                                <input type="checkbox" name="specific_meals[]" value="<?php echo $meal['id']; ?>"
-                                                       <?php echo in_array($meal['id'], $specific_meals) ? 'checked' : ''; ?>
-                                                       class="mr-2">
-                                                <?php echo htmlspecialchars($meal['name']); ?>
-                                            </label>
-                                        <?php endforeach; ?>
-                                    </div>
-                                </div>
-                                
-                                <div id="specific_categories_div" style="display: none;" class="md:col-span-2">
-                                    <label class="block text-gray-700 font-bold mb-2">Select Categories</label>
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <?php foreach($categories as $cat): ?>
-                                            <label class="inline-flex items-center">
-                                                <input type="checkbox" name="specific_categories[]" value="<?php echo $cat['id']; ?>"
-                                                       <?php echo in_array($cat['id'], $specific_categories) ? 'checked' : ''; ?>
-                                                       class="mr-2">
-                                                <?php echo ucfirst($cat['name']); ?>
-                                            </label>
-                                        <?php endforeach; ?>
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <label class="inline-flex items-center">
-                                        <input type="checkbox" name="is_active" <?php echo ($discount && $discount['is_active']) || !$discount ? 'checked' : ''; ?> class="mr-2">
-                                        Active
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <div class="mt-6">
-                                <button type="submit" class="bg-orange-custom text-white px-6 py-2 rounded hover:bg-orange-600">
-                                    <i class="fas fa-save mr-2"></i> <?php echo $action == 'add' ? 'Save Discount' : 'Update Discount'; ?>
-                                </button>
-                                <a href="discounts.php" class="ml-2 bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600">Cancel</a>
-                            </div>
-                        </form>
+                <div class="form-group">
+                    <label class="form-label">Discount Name *</label>
+                    <input type="text" name="name" required value="<?php echo $discount ? $discount['name'] : ''; ?>" placeholder="Welcome Discount" class="form-input">
+                </div>
+                
+                <div class="form-group full-width">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" rows="2" class="form-textarea"><?php echo $discount ? htmlspecialchars($discount['description']) : ''; ?></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Discount Type *</label>
+                    <select name="discount_type" required class="form-select">
+                        <option value="percentage" <?php echo ($discount && $discount['discount_type'] == 'percentage') ? 'selected' : ''; ?>>Percentage (%)</option>
+                        <option value="fixed_amount" <?php echo ($discount && $discount['discount_type'] == 'fixed_amount') ? 'selected' : ''; ?>>Fixed Amount ($)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Discount Value *</label>
+                    <input type="number" step="0.01" name="discount_value" required value="<?php echo $discount ? $discount['discount_value'] : ''; ?>" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Start Date *</label>
+                    <input type="datetime-local" name="start_date" required value="<?php echo $discount ? date('Y-m-d\TH:i', strtotime($discount['start_date'])) : ''; ?>" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">End Date *</label>
+                    <input type="datetime-local" name="end_date" required value="<?php echo $discount ? date('Y-m-d\TH:i', strtotime($discount['end_date'])) : ''; ?>" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Minimum Order Amount</label>
+                    <input type="number" step="0.01" name="minimum_order_amount" value="<?php echo $discount ? $discount['minimum_order_amount'] : '0'; ?>" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Maximum Discount Amount</label>
+                    <input type="number" step="0.01" name="maximum_discount_amount" value="<?php echo $discount ? $discount['maximum_discount_amount'] : ''; ?>" placeholder="Optional" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Usage Limit</label>
+                    <input type="number" name="usage_limit" value="<?php echo $discount ? $discount['usage_limit'] : ''; ?>" placeholder="Unlimited" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Applicable To *</label>
+                    <select name="applicable_to" id="applicable_to" required class="form-select">
+                        <option value="all" <?php echo ($discount && $discount['applicable_to'] == 'all') ? 'selected' : ''; ?>>All Meals</option>
+                        <option value="specific_meals" <?php echo ($discount && $discount['applicable_to'] == 'specific_meals') ? 'selected' : ''; ?>>Specific Meals</option>
+                        <option value="specific_categories" <?php echo ($discount && $discount['applicable_to'] == 'specific_categories') ? 'selected' : ''; ?>>Specific Categories</option>
+                    </select>
+                </div>
+                
+                <div id="specific_meals_div" style="display: none;" class="form-group full-width">
+                    <label class="form-label">Select Meals</label>
+                    <div class="checkbox-group">
+                        <?php foreach($meals as $meal): ?>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="specific_meals[]" value="<?php echo $meal['id']; ?>"
+                                       <?php echo in_array($meal['id'], $specific_meals) ? 'checked' : ''; ?>>
+                                <?php echo htmlspecialchars($meal['name']); ?>
+                            </label>
+                        <?php endforeach; ?>
                     </div>
-                    
-                    <script>
-                        const applicableTo = document.getElementById('applicable_to');
-                        const specificMealsDiv = document.getElementById('specific_meals_div');
-                        const specificCategoriesDiv = document.getElementById('specific_categories_div');
-                        
-                        function updateSpecificDivs() {
-                            const value = applicableTo.value;
-                            specificMealsDiv.style.display = value === 'specific_meals' ? 'block' : 'none';
-                            specificCategoriesDiv.style.display = value === 'specific_categories' ? 'block' : 'none';
-                        }
-                        
-                        applicableTo.addEventListener('change', updateSpecificDivs);
-                        updateSpecificDivs();
-                    </script>
-                <?php else: ?>
-                    <div class="bg-white rounded-lg shadow overflow-hidden">
-                        <table class="min-w-full">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                <?php foreach($discounts as $item): ?>
-                                    <tr>
-                                        <td class="px-6 py-4 font-bold text-orange-custom"><?php echo $item['code']; ?></td>
-                                        <td class="px-6 py-4"><?php echo htmlspecialchars($item['name']); ?></td>
-                                        <td class="px-6 py-4">
-                                            <?php echo $item['discount_type'] == 'percentage' ? $item['discount_value'] . '%' : '$' . number_format($item['discount_value'], 2); ?>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm">
-                                            <?php echo date('M d', strtotime($item['start_date'])); ?> - <?php echo date('M d, Y', strtotime($item['end_date'])); ?>
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <?php
-                                            $statusClass = '';
-                                            $statusText = '';
-                                            if($item['status'] == 'Active') {
-                                                $statusClass = 'bg-green-100 text-green-800';
-                                                $statusText = 'Active';
-                                            } elseif($item['status'] == 'Upcoming') {
-                                                $statusClass = 'bg-blue-100 text-blue-800';
-                                                $statusText = 'Upcoming';
-                                            } else {
-                                                $statusClass = 'bg-gray-100 text-gray-800';
-                                                $statusText = 'Expired';
-                                            }
-                                            ?>
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $statusClass; ?>">
-                                                <?php echo $statusText; ?>
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <a href="?action=edit&id=<?php echo $item['id']; ?>" class="text-indigo-600 hover:text-indigo-900 mr-3"><i class="fas fa-edit"></i></a>
-                                            <a href="?action=delete&id=<?php echo $item['id']; ?>" onclick="return confirm('Are you sure?')" class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></a>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                </div>
+                
+                <div id="specific_categories_div" style="display: none;" class="form-group full-width">
+                    <label class="form-label">Select Categories</label>
+                    <div class="checkbox-group">
+                        <?php foreach($categories as $cat): ?>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="specific_categories[]" value="<?php echo $cat['id']; ?>"
+                                       <?php echo in_array($cat['id'], $specific_categories) ? 'checked' : ''; ?>>
+                                <?php echo ucfirst($cat['name']); ?>
+                            </label>
+                        <?php endforeach; ?>
                     </div>
-                <?php endif; ?>
+                </div>
+                
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="is_active" <?php echo ($discount && $discount['is_active']) || !$discount ? 'checked' : ''; ?>>
+                        Active
+                    </label>
+                </div>
             </div>
-        </div>
+            
+            <div class="mt-6 flex gap-2">
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-save"></i> <?php echo $action == 'add' ? 'Save Discount' : 'Update Discount'; ?>
+                </button>
+                <a href="discounts.php" class="btn-secondary">Cancel</a>
+            </div>
+        </form>
     </div>
-</body>
-</html>
+    
+    <script>
+        const applicableTo = document.getElementById('applicable_to');
+        const specificMealsDiv = document.getElementById('specific_meals_div');
+        const specificCategoriesDiv = document.getElementById('specific_categories_div');
+        
+        function updateSpecificDivs() {
+            const value = applicableTo.value;
+            specificMealsDiv.style.display = value === 'specific_meals' ? 'block' : 'none';
+            specificCategoriesDiv.style.display = value === 'specific_categories' ? 'block' : 'none';
+        }
+        
+        applicableTo.addEventListener('change', updateSpecificDivs);
+        updateSpecificDivs();
+    </script>
+<?php else: ?>
+    <div class="table-container">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Value</th>
+                    <th>Period</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach($discounts as $item): ?>
+                    <tr>
+                        <td><strong class="text-orange-custom"><?php echo $item['code']; ?></strong></td>
+                        <td><?php echo htmlspecialchars($item['name']); ?></td>
+                        <td>
+                            <?php echo $item['discount_type'] == 'percentage' ? $item['discount_value'] . '%' : '$' . number_format($item['discount_value'], 2); ?>
+                        </td>
+                        <td>
+                            <?php echo date('M d', strtotime($item['start_date'])); ?> - <?php echo date('M d, Y', strtotime($item['end_date'])); ?>
+                        </td>
+                        <td>
+                            <span class="<?php echo $item['status'] == 'Active' ? 'badge-success' : ($item['status'] == 'Upcoming' ? 'badge-warning' : 'badge-danger'); ?>">
+                                <?php echo $item['status']; ?>
+                            </span>
+                        </td>
+                        <td class="action-buttons">
+                            <a href="?action=edit&id=<?php echo $item['id']; ?>" class="btn-primary" style="padding: 0.25rem 0.5rem; background-color: #4f46e5;">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="?action=delete&id=<?php echo $item['id']; ?>" onclick="return confirm('Are you sure?')" class="btn-danger" style="padding: 0.25rem 0.5rem;">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+<?php endif; ?>
+
+<?php require_once 'includes/footer.php'; ?>
