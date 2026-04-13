@@ -29,8 +29,8 @@ $page_title = $page_title ?? 'Admin Dashboard';
                 <p>Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?></p>
             </div>
             <nav class="sidebar-nav">
-                <a href="index.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>">
-                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                <a href="dashboard.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : ''; ?>">
+    <i class="fas fa-tachometer-alt"></i> Dashboard</a>
                 </a>
                 <a href="meals.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'meals.php' ? 'active' : ''; ?>">
                     <i class="fas fa-utensils"></i> Meals
