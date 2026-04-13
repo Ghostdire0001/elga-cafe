@@ -3,10 +3,8 @@ $page_title = 'Manage Meals';
 require_once '../includes/config.php';
 
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
-$message = '';
-$error = '';
 
-// Cloudinary upload function using unsigned preset
+// Cloudinary upload function
 function uploadToCloudinary($file) {
     $cloud_name = CLOUDINARY_CLOUD_NAME;
     $upload_preset = 'elga_cafe_unsigned';
@@ -21,7 +19,6 @@ function uploadToCloudinary($file) {
         return null;
     }
     
-    // Validate file type
     $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     $finfo = finfo_open(FILEINFO_MIME_TYPE);
     $mime_type = finfo_file($finfo, $file['tmp_name']);
@@ -31,12 +28,10 @@ function uploadToCloudinary($file) {
         return false;
     }
     
-    // Validate file size (max 5MB)
     if ($file['size'] > 5 * 1024 * 1024) {
         return false;
     }
     
-    // Prepare upload data
     $upload_data = [
         'file' => curl_file_create($file['tmp_name'], $mime_type, $file['name']),
         'upload_preset' => $upload_preset,
@@ -69,13 +64,11 @@ function uploadToCloudinary($file) {
         }
     }
     
-    error_log("Cloudinary upload failed. HTTP: $http_code, Response: " . substr($response, 0, 500));
+    error_log("Cloudinary upload failed. HTTP: $http_code");
     return null;
 }
 
-require_once 'includes/header.php';
-
-// Handle POST request (Add/Edit) - MUST be BEFORE any output
+// Handle Add/Edit Meal (POST request)
 if(($_SERVER['REQUEST_METHOD'] === 'POST') && in_array($action, ['add', 'edit'])) {
     $name = trim($_POST['name']);
     $description = trim($_POST['description']);
@@ -87,7 +80,6 @@ if(($_SERVER['REQUEST_METHOD'] === 'POST') && in_array($action, ['add', 'edit'])
     $is_featured = isset($_POST['is_featured']) ? 1 : 0;
     $is_popular = isset($_POST['is_popular']) ? 1 : 0;
     
-    // Handle image upload to Cloudinary
     $image_url = $_POST['existing_image'] ?? null;
     if (isset($_FILES['image']) && $_FILES['image']['error'] !== UPLOAD_ERR_NO_FILE) {
         $uploaded_image = uploadToCloudinary($_FILES['image']);
@@ -117,7 +109,6 @@ if(($_SERVER['REQUEST_METHOD'] === 'POST') && in_array($action, ['add', 'edit'])
         $message = "Meal updated successfully!";
     }
     
-    // Update dietary labels
     $pdo->prepare("DELETE FROM meal_dietary_labels WHERE meal_id = ?")->execute([$meal_id]);
     foreach($dietary_labels as $label_id) {
         $stmt = $pdo->prepare("INSERT INTO meal_dietary_labels (meal_id, dietary_label_id) VALUES (?, ?)");
@@ -147,6 +138,9 @@ if($action == 'toggle' && isset($_GET['id'])) {
     exit();
 }
 
+// Now include header (after all redirects)
+require_once 'includes/header.php';
+
 // Get all data for forms
 $categories = $pdo->query("SELECT * FROM categories ORDER BY display_order")->fetchAll();
 $dietary_labels = $pdo->query("SELECT * FROM dietary_labels ORDER BY id")->fetchAll();
@@ -171,12 +165,11 @@ $meals = $pdo->query("SELECT m.*, c.name as category_name
                       FROM meals m 
                       LEFT JOIN categories c ON m.category_id = c.id 
                       ORDER BY m.id DESC")->fetchAll();
-?>
 
-<?php if(isset($_GET['message'])): ?>
+// Display messages
+if(isset($_GET['message'])): ?>
     <div class="alert-success"><?php echo htmlspecialchars($_GET['message']); ?></div>
 <?php endif; ?>
-
 <?php if(isset($error)): ?>
     <div class="alert-error"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
@@ -189,7 +182,6 @@ $meals = $pdo->query("SELECT m.*, c.name as category_name
 </div>
 
 <?php if($action == 'add' || ($action == 'edit' && $meal)): ?>
-    <!-- Add/Edit Form -->
     <div class="form-container">
         <h2 class="text-xl font-bold mb-4"><?php echo $action == 'add' ? 'Add New Meal' : 'Edit Meal'; ?></h2>
         <form method="POST" action="" enctype="multipart/form-data">
@@ -291,7 +283,6 @@ $meals = $pdo->query("SELECT m.*, c.name as category_name
         </form>
     </div>
 <?php else: ?>
-    <!-- Meals List -->
     <div class="table-container">
         <table class="admin-table">
             <thead>
