@@ -1,19 +1,54 @@
 <?php
 require_once '../includes/config.php';
 
-echo "<h1>Cloudinary Connection Test - Fixed Version</h1>";
+echo "<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>Cloudinary Upload Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .success { color: green; background: #d4edda; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .error { color: red; background: #f8d7da; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .info { background: #e7f3ff; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        form { background: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        input, button { padding: 10px; margin: 5px; }
+        button { background: #F97316; color: white; border: none; cursor: pointer; border-radius: 5px; }
+        button:hover { background: #EA580C; }
+        img { max-width: 300px; border: 1px solid #ccc; padding: 5px; margin-top: 10px; }
+        code { background: #f4f4f4; padding: 2px 5px; border-radius: 3px; }
+        pre { background: #f4f4f4; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>☁️ Cloudinary Upload Test</h1>
+    <div class='info'>
+        <strong>Cloud Name:</strong> <?php echo defined('CLOUDINARY_CLOUD_NAME') ? CLOUDINARY_CLOUD_NAME : 'Not set'; ?><br>
+        <strong>cURL Extension:</strong> <?php echo function_exists('curl_version') ? '✅ Installed' : '❌ Not installed'; ?>
+    </div>";
 
-function uploadToCloudinaryFixed($file) {
+// Test upload function using unsigned preset
+function uploadToCloudinaryTest($file) {
     $cloud_name = CLOUDINARY_CLOUD_NAME;
-    $api_key = CLOUDINARY_API_KEY;
-    $api_secret = CLOUDINARY_API_SECRET;
+    $upload_preset = 'elga_cafe_unsigned'; // You need to create this in Cloudinary
     
-    if (empty($cloud_name) || empty($api_key) || empty($api_secret)) {
-        return "ERROR: Cloudinary credentials missing";
+    if (empty($cloud_name)) {
+        return "ERROR: Cloudinary cloud name missing from config";
     }
     
     if ($file['error'] !== UPLOAD_ERR_OK) {
-        return "ERROR: File upload error: " . $file['error'];
+        $errors = [
+            UPLOAD_ERR_INI_SIZE => "File too large (server limit)",
+            UPLOAD_ERR_FORM_SIZE => "File too large (form limit)",
+            UPLOAD_ERR_PARTIAL => "File only partially uploaded",
+            UPLOAD_ERR_NO_FILE => "No file uploaded",
+            UPLOAD_ERR_NO_TMP_DIR => "Missing temporary folder",
+            UPLOAD_ERR_CANT_WRITE => "Failed to write file to disk",
+            UPLOAD_ERR_EXTENSION => "File upload stopped by extension"
+        ];
+        $error_msg = isset($errors[$file['error']]) ? $errors[$file['error']] : "Unknown error code: " . $file['error'];
+        return "ERROR: " . $error_msg;
     }
     
     // Validate file type
@@ -23,53 +58,26 @@ function uploadToCloudinaryFixed($file) {
     finfo_close($finfo);
     
     if (!in_array($mime_type, $allowed_types)) {
-        return "ERROR: Invalid file type: " . $mime_type;
+        return "ERROR: Invalid file type. Allowed: JPG, PNG, GIF, WEBP. Got: " . $mime_type;
     }
     
-    // Prepare upload parameters
-    $timestamp = time();
-    $folder = 'elga-cafe/meals';
-    $public_id = $folder . '/test_' . $timestamp;
-    
-    // Parameters to sign (alphabetical order)
-    $params_to_sign = [
-        'api_key' => $api_key,
-        'public_id' => $public_id,
-        'timestamp' => $timestamp,
-    ];
-    
-    // Build string to sign
-    $signature_string = '';
-    foreach ($params_to_sign as $key => $value) {
-        $signature_string .= $key . '=' . $value . '&';
+    // Validate file size (max 5MB)
+    if ($file['size'] > 5 * 1024 * 1024) {
+        return "ERROR: File too large. Max size: 5MB. Your file: " . round($file['size'] / 1024 / 1024, 2) . "MB";
     }
-    $signature_string = rtrim($signature_string, '&');
     
-    echo "String to sign: " . $signature_string . "<br>";
-    
-    // Generate signature
-    $signature = hash_hmac('sha256', $signature_string, $api_secret);
-    echo "Generated signature: " . $signature . "<br>";
-    
-    // Read file and encode as base64
-    $image_data = base64_encode(file_get_contents($file['tmp_name']));
-    
-    // Complete upload data
+    // Prepare upload data
     $upload_data = [
-        'file' => 'data:' . $mime_type . ';base64,' . $image_data,
-        'public_id' => $public_id,
-        'api_key' => $api_key,
-        'timestamp' => $timestamp,
-        'signature' => $signature,
+        'file' => curl_file_create($file['tmp_name'], $mime_type, $file['name']),
+        'upload_preset' => $upload_preset,
     ];
     
-    // Send to Cloudinary
     $url = "https://api.cloudinary.com/v1_1/$cloud_name/image/upload";
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($upload_data));
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $upload_data);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
@@ -87,37 +95,85 @@ function uploadToCloudinaryFixed($file) {
         $result = json_decode($response, true);
         if (isset($result['secure_url'])) {
             return $result['secure_url'];
+        } else {
+            return "ERROR: No secure_url in response";
         }
     }
     
-    return "ERROR: HTTP $http_code - " . $response;
+    // Try to parse error message
+    $error_data = json_decode($response, true);
+    if (isset($error_data['error']['message'])) {
+        return "ERROR: " . $error_data['error']['message'];
+    }
+    
+    return "ERROR: HTTP $http_code - " . substr($response, 0, 200);
 }
 
-if (isset($_FILES['test_image']) && $_FILES['test_image']['error'] === UPLOAD_ERR_OK) {
-    echo "<h2>Upload Result:</h2>";
-    $result = uploadToCloudinaryFixed($_FILES['test_image']);
+// Handle file upload
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['test_image'])) {
+    echo "<h2>📤 Upload Result</h2>";
+    
+    $result = uploadToCloudinaryTest($_FILES['test_image']);
+    
     if (strpos($result, 'ERROR') === false) {
-        echo "<p style='color:green'>✓ Upload successful!</p>";
-        echo "<p>Image URL: <a href='$result' target='_blank'>$result</a></p>";
-        echo "<img src='$result' style='max-width: 300px; border: 1px solid #ccc; padding: 5px;'><br>";
+        echo "<div class='success'>✅ Upload successful!</div>";
+        echo "<p><strong>Image URL:</strong> <a href='$result' target='_blank'>$result</a></p>";
+        echo "<img src='$result' alt='Uploaded image'>";
+        echo "<p><strong>You can now use this URL in your meal entries!</strong></p>";
     } else {
-        echo "<p style='color:red'>✗ $result</p>";
+        echo "<div class='error'>❌ $result</div>";
+        
+        // Provide helpful tips based on error
+        if (strpos($result, 'upload preset') !== false) {
+            echo "<div class='info'>
+                <strong>🔧 How to fix:</strong><br>
+                1. Go to <a href='https://cloudinary.com/console/settings/upload' target='_blank'>Cloudinary Upload Settings</a><br>
+                2. Scroll to <strong>Upload Presets</strong><br>
+                3. Click <strong>Add Upload Preset</strong><br>
+                4. Set <strong>Preset name:</strong> <code>elga_cafe_unsigned</code><br>
+                5. Set <strong>Signing mode:</strong> <strong>Unsigned</strong><br>
+                6. Set <strong>Folder:</strong> <code>elga-cafe/meals</code><br>
+                7. Click <strong>Save</strong><br>
+                8. Try uploading again
+            </div>";
+        }
     }
-} else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    echo "<p style='color:orange'>No file uploaded or upload error occurred.</p>";
 }
 ?>
 
-<h2>Test Upload Form</h2>
+<h2>📸 Test Upload Form</h2>
 <form method="POST" action="" enctype="multipart/form-data">
     <input type="file" name="test_image" accept="image/jpeg,image/png,image/gif,image/webp" required>
-    <button type="submit">Test Upload</button>
+    <button type="submit">Upload to Cloudinary</button>
 </form>
 
-<h3>Current Cloudinary Configuration:</h3>
-<ul>
-    <li>Cloud Name: <?php echo defined('CLOUDINARY_CLOUD_NAME') ? CLOUDINARY_CLOUD_NAME : 'Not set'; ?></li>
-    <li>API Key: <?php echo defined('CLOUDINARY_API_KEY') ? substr(CLOUDINARY_API_KEY, 0, 10) . '...' : 'Not set'; ?></li>
-    <li>API Secret: <?php echo defined('CLOUDINARY_API_SECRET') ? '✓ Set (hidden)' : 'Not set'; ?></li>
-    <li>cURL installed: <?php echo function_exists('curl_version') ? '✓ Yes' : '✗ No'; ?></li>
-</ul>
+<div class="info">
+    <strong>📋 Before testing:</strong>
+    <ol>
+        <li>Go to <a href="https://cloudinary.com/console/settings/upload" target="_blank">Cloudinary Upload Settings</a></li>
+        <li>Scroll to <strong>Upload Presets</strong> section</li>
+        <li>Click <strong>Add Upload Preset</strong></li>
+        <li>Fill in:
+            <ul>
+                <li><strong>Preset name:</strong> <code>elga_cafe_unsigned</code></li>
+                <li><strong>Signing mode:</strong> Select <strong>Unsigned</strong></li>
+                <li><strong>Folder:</strong> <code>elga-cafe/meals</code></li>
+            </ul>
+        </li>
+        <li>Click <strong>Save</strong></li>
+        <li>Return here and upload an image</li>
+    </ol>
+</div>
+
+<div class="info">
+    <strong>📝 Current Environment Variables (from Render):</strong>
+    <ul>
+        <li>CLOUDINARY_CLOUD_NAME: <?php echo getenv('CLOUDINARY_CLOUD_NAME') ? '✅ Set to: ' . getenv('CLOUDINARY_CLOUD_NAME') : '❌ Not set'; ?></li>
+        <li>CLOUDINARY_API_KEY: <?php echo getenv('CLOUDINARY_API_KEY') ? '✅ Set' : '❌ Not set'; ?></li>
+        <li>CLOUDINARY_API_SECRET: <?php echo getenv('CLOUDINARY_API_SECRET') ? '✅ Set' : '❌ Not set'; ?></li>
+    </ul>
+    <p><small>Note: For unsigned upload preset, only the Cloud Name is required. API Key/Secret are not used.</small></p>
+</div>
+
+</body>
+</html>
