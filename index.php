@@ -6,6 +6,7 @@ require_once 'includes/theme.php';
 require_once 'includes/language.php';
 
 $current_lang = getCurrentLanguage();
+$current_theme = getCurrentTheme();
 
 // Get filter parameters
 $category_id = isset($_GET['category']) ? (int)$_GET['category'] : null;
@@ -33,7 +34,7 @@ usort($meals, function($a, $b) use ($pdo) {
 });
 ?>
 <!DOCTYPE html>
-<html lang="<?php echo $current_lang; ?>" data-theme="<?php echo getCurrentTheme(); ?>">
+<html lang="<?php echo $current_lang; ?>" data-theme="<?php echo $current_theme; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -148,7 +149,13 @@ usort($meals, function($a, $b) use ($pdo) {
                     <p class="text-orange-100 text-xs md:text-sm mt-0.5"><?php echo t('tagline'); ?></p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <?php echo getLanguageSelectorHTML(); ?>
+                    <select id="language-selector" class="lang-selector" onchange="changeLanguage(this.value)">
+                        <?php foreach($available_languages as $code => $name): ?>
+                            <option value="<?php echo $code; ?>" <?php echo $current_lang == $code ? 'selected' : ''; ?>>
+                                <?php echo $name; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                     <?php echo getThemeToggleHTML(); ?>
                     <div class="hidden md:block">
                         <div class="bg-white rounded-full w-10 h-10 flex items-center justify-center">
@@ -164,7 +171,6 @@ usort($meals, function($a, $b) use ($pdo) {
     <div class="container mx-auto px-4 py-4 md:py-6">
         <form method="GET" action="" id="filterForm" class="filters-container p-4 mb-4">
             <div class="flex flex-col md:flex-row gap-3">
-                <!-- Search Bar -->
                 <div class="flex-1">
                     <div class="relative">
                         <input type="text" name="search" id="search" 
@@ -175,8 +181,6 @@ usort($meals, function($a, $b) use ($pdo) {
                         <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
                     </div>
                 </div>
-                
-                <!-- Category Filter -->
                 <div>
                     <select name="category" id="category" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-custom theme-transition"
                             style="background-color: var(--bg-primary); color: var(--text-primary);">
@@ -190,7 +194,6 @@ usort($meals, function($a, $b) use ($pdo) {
                 </div>
             </div>
             
-            <!-- Dietary Filters -->
             <?php if(!empty($dietary_labels)): ?>
             <div class="mt-3">
                 <div class="flex flex-wrap gap-2 items-center">
@@ -212,7 +215,6 @@ usort($meals, function($a, $b) use ($pdo) {
             <?php endif; ?>
         </form>
 
-        <!-- Results Count -->
         <div class="mb-3">
             <p class="text-gray-600 text-sm">
                 <i class="fas fa-utensils mr-1"></i> 
@@ -220,7 +222,6 @@ usort($meals, function($a, $b) use ($pdo) {
             </p>
         </div>
 
-        <!-- Menu Grid - 2 columns on mobile -->
         <div class="menu-grid">
             <?php if(empty($meals)): ?>
                 <div class="col-span-full text-center py-12 md:py-16">
@@ -240,7 +241,6 @@ usort($meals, function($a, $b) use ($pdo) {
                 $dietary_labels_meal = getMealDietaryLabels($pdo, $meal['id']);
             ?>
                 <div class="meal-card overflow-hidden">
-                    <!-- Image Section -->
                     <div class="image-container relative">
                         <?php if($meal['image_url']): ?>
                             <img src="<?php echo $meal['image_url']; ?>" 
@@ -253,7 +253,6 @@ usort($meals, function($a, $b) use ($pdo) {
                             </div>
                         <?php endif; ?>
                         
-                        <!-- Badges - Priority: Discount first -->
                         <div class="absolute top-2 left-2 flex flex-col gap-1">
                             <?php if($discount): ?>
                                 <span class="bg-green-500 text-white px-2 py-0.5 rounded text-xs font-bold shadow-md">
@@ -279,7 +278,6 @@ usort($meals, function($a, $b) use ($pdo) {
                         </div>
                     </div>
                     
-                    <!-- Content Section -->
                     <div class="p-3">
                         <div class="flex justify-between items-start mb-1">
                             <h3 class="text-sm md:text-base font-bold line-clamp-2"><?php echo htmlspecialchars($meal['name']); ?></h3>
@@ -295,7 +293,6 @@ usort($meals, function($a, $b) use ($pdo) {
                         
                         <p class="text-gray-600 text-xs mb-2 line-clamp-2"><?php echo htmlspecialchars(substr($meal['description'], 0, 60)); ?></p>
                         
-                        <!-- Dietary Labels -->
                         <?php if(!empty($dietary_labels_meal)): ?>
                         <div class="flex flex-wrap gap-1 mb-2">
                             <?php foreach($dietary_labels_meal as $label): ?>
@@ -307,7 +304,6 @@ usort($meals, function($a, $b) use ($pdo) {
                         </div>
                         <?php endif; ?>
                         
-                        <!-- Meta Info -->
                         <div class="flex justify-between items-center text-xs text-gray-500 pt-2 border-t" style="border-color: var(--border-color);">
                             <div class="flex items-center gap-1">
                                 <i class="far fa-clock"></i>
@@ -326,7 +322,6 @@ usort($meals, function($a, $b) use ($pdo) {
         </div>
     </div>
 
-    <!-- Footer -->
     <footer class="mt-12 py-6 md:py-8" style="background-color: #1f2937; color: white;">
         <div class="container mx-auto px-4 text-center">
             <div class="mb-4">
@@ -339,7 +334,6 @@ usort($meals, function($a, $b) use ($pdo) {
     </footer>
 
     <script>
-        // Auto-submit form when filters change
         document.getElementById('category')?.addEventListener('change', function() {
             document.getElementById('filterForm').submit();
         });
@@ -350,7 +344,6 @@ usort($meals, function($a, $b) use ($pdo) {
             });
         });
         
-        // Search with debounce
         let searchTimeout;
         const searchInput = document.getElementById('search');
         if(searchInput) {
@@ -362,13 +355,17 @@ usort($meals, function($a, $b) use ($pdo) {
             });
         }
         
-        // Reset filters
         function resetFilters() {
             window.location.href = window.location.pathname;
+        }
+        
+        function changeLanguage(lang) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('lang', lang);
+            window.location.href = url.toString();
         }
     </script>
     
     <?php echo getThemeScript(); ?>
-    <?php echo getLanguageScript(); ?>
 </body>
 </html>
