@@ -1,6 +1,6 @@
             </div>
             <!-- Footer -->
-            <div class="border-t border-gray-200 mt-8 pt-6 pb-4 text-center" style="border-color: var(--border-color);">
+            <div class="border-t mt-8 pt-6 pb-4 text-center" style="border-color: var(--border-color);">
                 <div class="footer-brand">
                     <i class="fas fa-mug-hot text-orange-custom"></i>
                     <span><?php echo t('site_name'); ?> <?php echo t('admin_panel'); ?></span>
@@ -30,6 +30,8 @@
             sidebar.classList.toggle('active');
             overlay.classList.toggle('active');
         }
+        
+        // Close sidebar when clicking a link on mobile
         if(window.innerWidth <= 767) {
             document.querySelectorAll('.sidebar-nav a').forEach(link => {
                 link.addEventListener('click', () => {
@@ -37,6 +39,8 @@
                 });
             });
         }
+        
+        // Handle window resize
         window.addEventListener('resize', function() {
             if(window.innerWidth > 767) {
                 document.getElementById('sidebar')?.classList.remove('active');
