@@ -27,7 +27,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
         $stmt->execute([$user['id']]);
         
-        header('Location: admin/dashboard.php');
+        header('Location: dashboard.php');
         exit();
     } else {
         $error = 'Invalid username or password';
