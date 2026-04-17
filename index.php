@@ -1,4 +1,21 @@
 <?php
+// ALL cookie/session logic MUST be at the top, before ANY HTML output
+session_start();
+
+// Handle language from URL parameter
+if (isset($_GET['lang'])) {
+    $lang = $_GET['lang'];
+    setcookie('user_lang', $lang, time() + (86400 * 30), "/", "", false, true);
+    $_SESSION['user_lang'] = $lang;
+}
+
+// Handle theme from URL parameter
+if (isset($_GET['theme'])) {
+    $theme = $_GET['theme'];
+    setcookie('user_theme', $theme, time() + (86400 * 30), "/", "", false, true);
+    $_SESSION['user_theme'] = $theme;
+}
+
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/translations.php';
