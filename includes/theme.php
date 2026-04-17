@@ -4,7 +4,11 @@
 function getCurrentTheme() {
     // Check URL parameter first
     if (isset($_GET['theme'])) {
-        return $_GET['theme'];
+        $theme = $_GET['theme'];
+        // Set cookie immediately when URL parameter is present
+        setcookie('user_theme', $theme, time() + (86400 * 30), "/", "", false, true);
+        $_SESSION['user_theme'] = $theme;
+        return $theme;
     }
     
     // Then check cookie
@@ -82,53 +86,28 @@ function getThemeScript() {
     return '
     <script>
         function initTheme() {
-            // Get theme from URL parameter first
-            const urlParams = new URLSearchParams(window.location.search);
-            let theme = urlParams.get("theme");
-            
-            if (!theme) {
-                theme = localStorage.getItem("theme") || "light";
-            }
-            
-            document.documentElement.setAttribute("data-theme", theme);
-            localStorage.setItem("theme", theme);
-            
-            // Update cookie for server-side
-            document.cookie = "user_theme=" + theme + "; path=/; max-age=" + (30 * 24 * 60 * 60);
-            
             const themeToggle = document.getElementById("theme-toggle");
             if (themeToggle) {
-                const icon = themeToggle.querySelector("i");
-                if (theme === "dark") {
-                    icon.classList.remove("fa-moon");
-                    icon.classList.add("fa-sun");
-                } else {
-                    icon.classList.remove("fa-sun");
-                    icon.classList.add("fa-moon");
-                }
-                
                 themeToggle.addEventListener("click", function() {
                     const currentTheme = document.documentElement.getAttribute("data-theme");
                     const newTheme = currentTheme === "dark" ? "light" : "dark";
                     document.documentElement.setAttribute("data-theme", newTheme);
                     localStorage.setItem("theme", newTheme);
-                    document.cookie = "user_theme=" + newTheme + "; path=/; max-age=" + (30 * 24 * 60 * 60);
                     
-                    if (newTheme === "dark") {
-                        icon.classList.remove("fa-moon");
-                        icon.classList.add("fa-sun");
-                    } else {
-                        icon.classList.remove("fa-sun");
-                        icon.classList.add("fa-moon");
-                    }
-                    
-                    // Update URL without reload
+                    // Reload page to let PHP set the cookie
                     const url = new URL(window.location.href);
                     url.searchParams.set("theme", newTheme);
-                    window.history.pushState({}, "", url);
+                    window.location.href = url.toString();
                 });
             }
         }
+        
+        // Set initial theme from HTML attribute
+        const initialTheme = document.documentElement.getAttribute("data-theme");
+        if (initialTheme) {
+            localStorage.setItem("theme", initialTheme);
+        }
+        
         initTheme();
     </script>';
 }
