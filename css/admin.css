@@ -1,4 +1,131 @@
 /* Admin Panel Styles - Elga Cafe */
+/* Theme Variables - MUST be at the very top */
+:root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f9fafb;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --card-bg: #ffffff;
+    --border-color: #e5e7eb;
+    --sidebar-bg: #1f2937;
+    --sidebar-text: #ffffff;
+    --header-bg: #1f2937;
+}
+
+[data-theme="dark"] {
+    --bg-primary: #111827;
+    --bg-secondary: #1f2937;
+    --text-primary: #f9fafb;
+    --text-secondary: #9ca3af;
+    --card-bg: #1f2937;
+    --border-color: #374151;
+    --sidebar-bg: #030712;
+    --sidebar-text: #f9fafb;
+    --header-bg: #030712;
+}
+
+/* Apply theme variables to body and containers */
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.admin-container {
+    background-color: var(--bg-primary);
+}
+
+.main-content {
+    background-color: var(--bg-primary);
+}
+
+.content-wrapper {
+    background-color: var(--bg-primary);
+}
+
+/* Sidebar theme */
+.sidebar {
+    background-color: var(--sidebar-bg);
+    color: var(--sidebar-text);
+}
+
+/* Card theme */
+.stat-card, .form-container, .table-container, .bg-white {
+    background-color: var(--card-bg) !important;
+    color: var(--text-primary);
+}
+
+/* Table theme */
+.admin-table th {
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+.admin-table td {
+    background-color: var(--card-bg);
+    color: var(--text-primary);
+    border-bottom-color: var(--border-color);
+}
+
+/* Form inputs */
+.form-input, .form-select, .form-textarea {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+    border-color: #F97316;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+/* Page header */
+.page-title {
+    color: var(--text-primary);
+}
+
+/* Alert boxes */
+.alert-success {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.alert-error {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+/* Border colors */
+.border-t, .border-b, .border-gray-200 {
+    border-color: var(--border-color) !important;
+}
+
+/* Text colors */
+.text-gray-500, .text-gray-600, .text-gray-700 {
+    color: var(--text-secondary);
+}
+
+.text-gray-800, .text-gray-900 {
+    color: var(--text-primary);
+}
+
+/* Badges */
+.badge-success {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.badge-danger {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.badge-warning {
+    background-color: #fed7aa;
+    color: #92400e;
+}
+
+/* Rest of your existing admin.css styles below... */
 :root {
     --orange-primary: #F97316;
     --orange-dark: #EA580C;
