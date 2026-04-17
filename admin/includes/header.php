@@ -29,8 +29,81 @@ $page_title = $page_title ?? 'Admin Dashboard';
     <link rel="stylesheet" href="../css/admin.css">
     <link rel="stylesheet" href="../../css/common.css">
     <?php echo getThemeStyles(); ?>
+    <style>
+        /* Ensure sidebar is fixed on scroll */
+        .admin-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        .sidebar {
+            width: 280px;
+            background-color: var(--sidebar-bg);
+            color: var(--sidebar-text);
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 1000;
+            transition: transform 0.3s ease-in-out;
+        }
+        
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            overflow-x: auto;
+            background-color: var(--bg-primary);
+            min-height: 100vh;
+        }
+        
+        /* Mobile styles */
+        @media (max-width: 767px) {
+            .sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
+        
+        .content-wrapper {
+            padding: 1.5rem;
+        }
+        
+        @media (min-width: 768px) {
+            .content-wrapper {
+                padding: 2rem;
+            }
+        }
+        
+        /* Theme toggle and language selector styling */
+        .theme-toggle, .lang-selector {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            color: var(--text-primary);
+        }
+        
+        .theme-toggle:hover {
+            background: rgba(249, 115, 22, 0.1);
+        }
+        
+        .lang-selector {
+            background-color: var(--bg-primary);
+        }
+    </style>
 </head>
-<body class="theme-transition">
+<body>
     <button class="menu-toggle" onclick="toggleSidebar()">
         <i class="fas fa-bars"></i>
     </button>
