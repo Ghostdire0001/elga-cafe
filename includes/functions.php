@@ -131,4 +131,25 @@ function getMealDietaryLabels($pdo, $meal_id) {
         return [];
     }
 }
+// Get meals with priority sorting (discount > popular > featured)
+function getMealsWithPriority($pdo, $category_id = null, $dietary_ids = [], $search = '') {
+    $meals = getMeals($pdo, $category_id, $dietary_ids, $search);
+    
+    // Sort by priority: Discount > Popular > Featured
+    usort($meals, function($a, $b) use ($pdo) {
+        $discount_a = getMealDiscount($pdo, $a['id'], $a['price'], $a['category_id']);
+        $discount_b = getMealDiscount($pdo, $b['id'], $b['price'], $b['category_id']);
+        
+        if ($discount_a && !$discount_b) return -1;
+        if (!$discount_a && $discount_b) return 1;
+        if ($a['is_popular'] && !$b['is_popular']) return -1;
+        if (!$a['is_popular'] && $b['is_popular']) return 1;
+        if ($a['is_featured'] && !$b['is_featured']) return -1;
+        if (!$a['is_featured'] && $b['is_featured']) return 1;
+        
+        return 0;
+    });
+    
+    return $meals;
+}
 ?>
