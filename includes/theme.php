@@ -1,17 +1,29 @@
 <?php
 // Theme handling
 function getCurrentTheme() {
+    // Check URL parameter first
+    if (isset($_GET['theme'])) {
+        $theme = $_GET['theme'];
+        setThemeCookie($theme);
+        return $theme;
+    }
+    
+    // Then check cookie
     if (isset($_COOKIE['user_theme'])) {
         return $_COOKIE['user_theme'];
     }
+    
+    // Then check session
     if (isset($_SESSION['user_theme'])) {
         return $_SESSION['user_theme'];
     }
+    
+    // Default to light
     return 'light';
 }
 
 function setThemeCookie($theme) {
-    setcookie('user_theme', $theme, time() + (86400 * 30), "/");
+    setcookie('user_theme', $theme, time() + (86400 * 30), "/", "", false, true);
     $_SESSION['user_theme'] = $theme;
 }
 
@@ -35,8 +47,6 @@ function getThemeStyles() {
             --text-secondary: #6b7280;
             --card-bg: #ffffff;
             --border-color: #e5e7eb;
-            --sidebar-bg: #1f2937;
-            --sidebar-text: #ffffff;
         }
         
         [data-theme="dark"] {
@@ -46,8 +56,6 @@ function getThemeStyles() {
             --text-secondary: #9ca3af;
             --card-bg: #1f2937;
             --border-color: #374151;
-            --sidebar-bg: #030712;
-            --sidebar-text: #f9fafb;
         }
         
         body {
@@ -62,10 +70,13 @@ function getThemeStyles() {
             background: transparent;
             border: none;
             font-size: 1.25rem;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
         }
         
         .theme-toggle:hover {
             transform: rotate(15deg);
+            background: rgba(249, 115, 22, 0.1);
         }
         
         .theme-transition {
@@ -78,36 +89,50 @@ function getThemeScript() {
     return '
     <script>
         function initTheme() {
-            const savedTheme = localStorage.getItem(\'theme\') || \'light\';
-            document.documentElement.setAttribute(\'data-theme\', savedTheme);
+            // Get theme from URL parameter first
+            const urlParams = new URLSearchParams(window.location.search);
+            let theme = urlParams.get("theme");
             
-            const themeToggle = document.getElementById(\'theme-toggle\');
+            if (!theme) {
+                theme = localStorage.getItem("theme") || "light";
+            }
+            
+            document.documentElement.setAttribute("data-theme", theme);
+            localStorage.setItem("theme", theme);
+            
+            // Update cookie for server-side
+            document.cookie = "user_theme=" + theme + "; path=/; max-age=" + (30 * 24 * 60 * 60);
+            
+            const themeToggle = document.getElementById("theme-toggle");
             if (themeToggle) {
-                const icon = themeToggle.querySelector(\'i\');
-                if (savedTheme === \'dark\') {
-                    icon.classList.remove(\'fa-moon\');
-                    icon.classList.add(\'fa-sun\');
+                const icon = themeToggle.querySelector("i");
+                if (theme === "dark") {
+                    icon.classList.remove("fa-moon");
+                    icon.classList.add("fa-sun");
                 } else {
-                    icon.classList.remove(\'fa-sun\');
-                    icon.classList.add(\'fa-moon\');
+                    icon.classList.remove("fa-sun");
+                    icon.classList.add("fa-moon");
                 }
                 
-                themeToggle.addEventListener(\'click\', function() {
-                    const currentTheme = document.documentElement.getAttribute(\'data-theme\');
-                    const newTheme = currentTheme === \'dark\' ? \'light\' : \'dark\';
-                    document.documentElement.setAttribute(\'data-theme\', newTheme);
-                    localStorage.setItem(\'theme\', newTheme);
+                themeToggle.addEventListener("click", function() {
+                    const currentTheme = document.documentElement.getAttribute("data-theme");
+                    const newTheme = currentTheme === "dark" ? "light" : "dark";
+                    document.documentElement.setAttribute("data-theme", newTheme);
+                    localStorage.setItem("theme", newTheme);
+                    document.cookie = "user_theme=" + newTheme + "; path=/; max-age=" + (30 * 24 * 60 * 60);
                     
-                    if (newTheme === \'dark\') {
-                        icon.classList.remove(\'fa-moon\');
-                        icon.classList.add(\'fa-sun\');
+                    if (newTheme === "dark") {
+                        icon.classList.remove("fa-moon");
+                        icon.classList.add("fa-sun");
                     } else {
-                        icon.classList.remove(\'fa-sun\');
-                        icon.classList.add(\'fa-moon\');
+                        icon.classList.remove("fa-sun");
+                        icon.classList.add("fa-moon");
                     }
                     
-                    // Update cookie for server-side
-                    document.cookie = "user_theme=" + newTheme + "; path=/; max-age=" + (30 * 24 * 60 * 60);
+                    // Update URL without reload
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("theme", newTheme);
+                    window.history.pushState({}, "", url);
                 });
             }
         }
