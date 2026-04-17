@@ -10,7 +10,7 @@ if(session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 if(!isset($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['admin', 'manager'])) {
-    header('Location: login.php');
+    header('Location: index.php');
     exit();
 }
 $page_title = $page_title ?? 'Admin Dashboard';
