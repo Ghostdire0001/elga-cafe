@@ -1,21 +1,41 @@
 <?php
+// ALL cookie/session logic MUST be at the top, before ANY output
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/translations.php';
 require_once __DIR__ . '/../../includes/theme.php';
 require_once __DIR__ . '/../../includes/language.php';
 
-// Get current language for this page
-$current_lang = getCurrentLanguage();
+// Handle language from URL parameter (must be before any output)
+if (isset($_GET['lang'])) {
+    $lang = $_GET['lang'];
+    setcookie('user_lang', $lang, time() + (86400 * 30), "/", "", false, true);
+    $_SESSION['user_lang'] = $lang;
+}
 
+// Handle theme from URL parameter (must be before any output)
+if (isset($_GET['theme'])) {
+    $theme = $_GET['theme'];
+    setcookie('user_theme', $theme, time() + (86400 * 30), "/", "", false, true);
+    $_SESSION['user_theme'] = $theme;
+}
+
+// Get current language and theme
+$current_lang = getCurrentLanguage();
+$current_theme = getCurrentTheme();
+
+// Session check
 if(session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 if(!isset($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['admin', 'manager'])) {
-    header('Location: index.php');
+    header('Location: login.php');
     exit();
 }
+
 $page_title = $page_title ?? 'Admin Dashboard';
-?><!DOCTYPE html>
-<html lang="<?php echo $current_lang; ?>" data-theme="<?php echo getCurrentTheme(); ?>">
+?>
+<!DOCTYPE html>
+<html lang="<?php echo $current_lang; ?>" data-theme="<?php echo $current_theme; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
@@ -28,9 +48,37 @@ $page_title = $page_title ?? 'Admin Dashboard';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/admin.css">
     <link rel="stylesheet" href="../../css/common.css">
-    <?php echo getThemeStyles(); ?>
+    
     <style>
-        /* Ensure sidebar is fixed on scroll */
+        /* Theme Variables */
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f9fafb;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --card-bg: #ffffff;
+            --border-color: #e5e7eb;
+            --sidebar-bg: #1f2937;
+            --sidebar-text: #ffffff;
+        }
+        
+        [data-theme="dark"] {
+            --bg-primary: #111827;
+            --bg-secondary: #1f2937;
+            --text-primary: #f9fafb;
+            --text-secondary: #9ca3af;
+            --card-bg: #1f2937;
+            --border-color: #374151;
+            --sidebar-bg: #030712;
+            --sidebar-text: #f9fafb;
+        }
+        
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
         .admin-container {
             display: flex;
             min-height: 100vh;
@@ -57,17 +105,14 @@ $page_title = $page_title ?? 'Admin Dashboard';
             min-height: 100vh;
         }
         
-        /* Mobile styles */
         @media (max-width: 767px) {
             .sidebar {
                 transform: translateX(-100%);
                 position: fixed;
             }
-            
             .sidebar.active {
                 transform: translateX(0);
             }
-            
             .main-content {
                 margin-left: 0;
                 width: 100%;
@@ -84,7 +129,95 @@ $page_title = $page_title ?? 'Admin Dashboard';
             }
         }
         
-        /* Theme toggle and language selector styling */
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .sidebar-header h2 {
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+        
+        .sidebar-header p {
+            font-size: 0.875rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+        
+        .sidebar-nav {
+            margin-top: 1rem;
+        }
+        
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-nav a i {
+            width: 1.5rem;
+            margin-right: 0.75rem;
+        }
+        
+        .sidebar-nav a:hover {
+            background-color: #374151;
+            padding-left: 1.5rem;
+        }
+        
+        .sidebar-nav a.active {
+            background-color: #F97316;
+        }
+        
+        .sidebar-nav .logout {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 1rem;
+            padding-top: 1rem;
+            color: #f87171;
+        }
+        
+        .menu-toggle {
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            z-index: 1001;
+            background: #F97316;
+            color: white;
+            padding: 0.625rem;
+            border-radius: 0.5rem;
+            border: none;
+            cursor: pointer;
+            display: none;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        @media (max-width: 767px) {
+            .menu-toggle {
+                display: block;
+            }
+            body {
+                padding-top: 4rem;
+            }
+        }
+        
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+        
+        .overlay.active {
+            display: block;
+        }
+        
         .theme-toggle, .lang-selector {
             background: transparent;
             border: 1px solid var(--border-color);
@@ -100,6 +233,122 @@ $page_title = $page_title ?? 'Admin Dashboard';
         
         .lang-selector {
             background-color: var(--bg-primary);
+        }
+        
+        /* Stats cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        @media (min-width: 768px) {
+            .stats-grid {
+                gap: 1.5rem;
+            }
+        }
+        
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+        }
+        
+        @media (min-width: 768px) {
+            .stat-card {
+                padding: 1.5rem;
+            }
+        }
+        
+        .stat-card .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        @media (min-width: 768px) {
+            .stat-card .stat-value {
+                font-size: 1.875rem;
+            }
+        }
+        
+        .stat-card .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        
+        .page-header {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        @media (min-width: 768px) {
+            .page-header {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 2rem;
+            }
+        }
+        
+        .page-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+        
+        @media (min-width: 768px) {
+            .page-title {
+                font-size: 1.875rem;
+            }
+        }
+        
+        .btn-success {
+            background-color: #10b981;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background 0.3s ease;
+        }
+        
+        .btn-success:hover {
+            background-color: #059669;
+        }
+        
+        .alert-success {
+            background-color: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .badge-success {
+            background-color: #d1fae5;
+            color: #065f46;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        .text-orange-custom {
+            color: #F97316;
+        }
+        
+        .bg-orange-custom {
+            background-color: #F97316;
         }
     </style>
 </head>
@@ -138,6 +387,14 @@ $page_title = $page_title ?? 'Admin Dashboard';
         <div class="main-content">
             <div class="content-wrapper">
                 <div class="flex justify-end items-center gap-3 mb-4">
-                    <?php echo getLanguageSelectorHTML(); ?>
-                    <?php echo getThemeToggleHTML(); ?>
+                    <select id="language-selector" class="lang-selector" onchange="changeLanguage(this.value)">
+                        <?php foreach($available_languages as $code => $name): ?>
+                            <option value="<?php echo $code; ?>" <?php echo $current_lang == $code ? 'selected' : ''; ?>>
+                                <?php echo $name; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button id="theme-toggle" class="theme-toggle">
+                        <i class="fas <?php echo $current_theme == 'dark' ? 'fa-sun' : 'fa-moon'; ?>"></i>
+                    </button>
                 </div>
