@@ -1,11 +1,15 @@
 <?php
-$page_title = t('dashboard');
+// Load required files FIRST
 require_once '../includes/config.php';
+require_once '../includes/translations.php';
 require_once '../includes/theme.php';
 require_once '../includes/language.php';
-require_once 'includes/header.php';
 
+// Set current language
 $current_lang = getCurrentLanguage();
+$page_title = t('dashboard');
+
+require_once 'includes/header.php';
 
 // Get stats
 $total_meals = $pdo->query("SELECT COUNT(*) FROM meals")->fetchColumn();
