@@ -3,7 +3,7 @@ session_start();
 
 // If already logged in as admin, redirect to dashboard
 if(isset($_SESSION['user_id']) && in_array($_SESSION['user_role'], ['admin', 'manager'])) {
-    header('Location: dashboard.php');
+    header('Location: admin/dashboard.php');
     exit();
 }
 
@@ -27,7 +27,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
         $stmt->execute([$user['id']]);
         
-        header('Location: dashboard.php');
+        header('Location: admin/dashboard.php');
         exit();
     } else {
         $error = 'Invalid username or password';
