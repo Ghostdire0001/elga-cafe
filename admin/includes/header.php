@@ -379,6 +379,9 @@ $page_title = $page_title ?? 'Admin Dashboard';
                 <a href="discounts.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'discounts.php' ? 'active' : ''; ?>">
                     <i class="fas fa-tag"></i> <?php echo t('discounts'); ?>
                 </a>
+<a href="settings.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active' : ''; ?>">
+    <i class="fas fa-cog"></i> <?php echo t('settings'); ?>
+</a>
                 <a href="logout.php" class="logout">
                     <i class="fas fa-sign-out-alt"></i> <?php echo t('logout'); ?>
                 </a>
