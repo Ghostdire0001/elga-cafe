@@ -384,6 +384,9 @@ $page_title = $page_title ?? 'Admin Dashboard';
                 <a href="generate-table-qrcodes.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'generate-table-qrcodes.php' ? 'active' : ''; ?>">
                     <i class="fas fa-qrcode"></i> <?php echo t('table_qr_codes'); ?>
                 </a>
+                <a href="orders.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'orders.php' ? 'active' : ''; ?>">
+    <i class="fas fa-shopping-cart"></i> <?php echo t('orders'); ?>
+</a>
                 <a href="logout.php" class="logout">
                     <i class="fas fa-sign-out-alt"></i> <?php echo t('logout'); ?>
                 </a>
