@@ -2,22 +2,13 @@
 require_once __DIR__ . '/translations.php';
 
 function getCurrentLanguage() {
-    // Check URL parameter first (handled at top of index.php)
-    if (isset($_GET['lang'])) {
-        return $_GET['lang'];
-    }
-    
-    // Then check cookie
+    // Only READ from cookie/session, never WRITE
     if (isset($_COOKIE['user_lang'])) {
         return $_COOKIE['user_lang'];
     }
-    
-    // Then check session
     if (isset($_SESSION['user_lang'])) {
         return $_SESSION['user_lang'];
     }
-    
-    // Default to Amharic
     return 'am';
 }
 
