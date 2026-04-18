@@ -1,27 +1,28 @@
 <?php
-// ALL cookie/session logic MUST be at the top, before ANY HTML output
+// ============================================
+// CRITICAL: No HTML, no echo, no whitespace before this point
+// ============================================
 session_start();
 
-// Handle language from URL parameter
+// Handle ALL URL parameters that need cookies FIRST
 if (isset($_GET['lang'])) {
-    $lang = $_GET['lang'];
-    setcookie('user_lang', $lang, time() + (86400 * 30), "/", "", false, true);
-    $_SESSION['user_lang'] = $lang;
+    setcookie('user_lang', $_GET['lang'], time() + (86400 * 30), "/", "", false, true);
+    $_SESSION['user_lang'] = $_GET['lang'];
 }
 
-// Handle theme from URL parameter
 if (isset($_GET['theme'])) {
-    $theme = $_GET['theme'];
-    setcookie('user_theme', $theme, time() + (86400 * 30), "/", "", false, true);
-    $_SESSION['user_theme'] = $theme;
+    setcookie('user_theme', $_GET['theme'], time() + (86400 * 30), "/", "", false, true);
+    $_SESSION['user_theme'] = $_GET['theme'];
 }
 
+// Now include files (after all cookie logic)
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/translations.php';
 require_once 'includes/theme.php';
 require_once 'includes/language.php';
 
+// Get current settings (only reads cookies/session, doesn't write)
 $current_lang = getCurrentLanguage();
 $current_theme = getCurrentTheme();
 
@@ -35,7 +36,7 @@ $categories = getCategories($pdo);
 $dietary_labels = getDietaryLabels($pdo);
 $meals = getMeals($pdo, $category_id, $dietary_ids, $search);
 
-// Sort meals: Discount first, then Popular, then Featured
+// Sort meals
 usort($meals, function($a, $b) use ($pdo) {
     $discount_a = getMealDiscount($pdo, $a['id'], $a['price'], $a['category_id']);
     $discount_b = getMealDiscount($pdo, $b['id'], $b['price'], $b['category_id']);
@@ -100,7 +101,6 @@ usort($meals, function($a, $b) use ($pdo) {
             background: linear-gradient(135deg, #F9731620, #F9731605);
         }
         
-        /* Mobile: 2 columns */
         .menu-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -157,7 +157,6 @@ usort($meals, function($a, $b) use ($pdo) {
     </style>
 </head>
 <body class="theme-transition">
-    <!-- Header -->
     <header class="bg-orange-custom text-white shadow-lg sticky top-0 z-50">
         <div class="container mx-auto px-4 py-3 md:py-4">
             <div class="flex justify-between items-center">
@@ -166,13 +165,7 @@ usort($meals, function($a, $b) use ($pdo) {
                     <p class="text-orange-100 text-xs md:text-sm mt-0.5"><?php echo t('tagline'); ?></p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <select id="language-selector" class="lang-selector" onchange="changeLanguage(this.value)">
-                        <?php foreach($available_languages as $code => $name): ?>
-                            <option value="<?php echo $code; ?>" <?php echo $current_lang == $code ? 'selected' : ''; ?>>
-                                <?php echo $name; ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php echo getLanguageSelectorHTML(); ?>
                     <?php echo getThemeToggleHTML(); ?>
                     <div class="hidden md:block">
                         <div class="bg-white rounded-full w-10 h-10 flex items-center justify-center">
@@ -184,7 +177,6 @@ usort($meals, function($a, $b) use ($pdo) {
         </div>
     </header>
 
-    <!-- Search and Filters -->
     <div class="container mx-auto px-4 py-4 md:py-6">
         <form method="GET" action="" id="filterForm" class="filters-container p-4 mb-4">
             <div class="flex flex-col md:flex-row gap-3">
