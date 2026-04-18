@@ -15,16 +15,19 @@ if (isset($_GET['theme'])) {
     $_SESSION['user_theme'] = $_GET['theme'];
 }
 
-// Now include files (after all cookie logic)
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/translations.php';
 require_once 'includes/theme.php';
 require_once 'includes/language.php';
+require_once 'includes/settings-functions.php';
+require_once 'includes/order-functions.php';
 
-// Get current settings (only reads cookies/session, doesn't write)
+// Get current settings
 $current_lang = getCurrentLanguage();
 $current_theme = getCurrentTheme();
+$order_enabled = isOrderEnabled($pdo);
+$current_table = getTableNumber();
 
 // Get filter parameters
 $category_id = isset($_GET['category']) ? (int)$_GET['category'] : null;
@@ -36,7 +39,7 @@ $categories = getCategories($pdo);
 $dietary_labels = getDietaryLabels($pdo);
 $meals = getMeals($pdo, $category_id, $dietary_ids, $search);
 
-// Sort meals
+// Sort meals: Discount first, then Popular, then Featured
 usort($meals, function($a, $b) use ($pdo) {
     $discount_a = getMealDiscount($pdo, $a['id'], $a['price'], $a['category_id']);
     $discount_b = getMealDiscount($pdo, $b['id'], $b['price'], $b['category_id']);
@@ -50,6 +53,16 @@ usort($meals, function($a, $b) use ($pdo) {
     
     return 0;
 });
+
+// Load cart from database if ordering enabled
+if ($order_enabled && $current_table) {
+    $cart_data = getCartFromDatabase($pdo, $current_table, session_id());
+    $cart_items = $cart_data['items'];
+    $cart_subtotal = $cart_data['subtotal'];
+} else {
+    $cart_items = [];
+    $cart_subtotal = 0;
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo $current_lang; ?>" data-theme="<?php echo $current_theme; ?>">
@@ -165,8 +178,16 @@ usort($meals, function($a, $b) use ($pdo) {
                     <p class="text-orange-100 text-xs md:text-sm mt-0.5"><?php echo t('tagline'); ?></p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <?php echo getLanguageSelectorHTML(); ?>
-                    <?php echo getThemeToggleHTML(); ?>
+                    <select id="language-selector" class="lang-selector" onchange="changeLanguage(this.value)">
+                        <?php foreach($available_languages as $code => $name): ?>
+                            <option value="<?php echo $code; ?>" <?php echo $current_lang == $code ? 'selected' : ''; ?>>
+                                <?php echo $name; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button id="theme-toggle" class="theme-toggle text-white">
+                        <i class="fas <?php echo $current_theme == 'dark' ? 'fa-sun' : 'fa-moon'; ?>"></i>
+                    </button>
                     <div class="hidden md:block">
                         <div class="bg-white rounded-full w-10 h-10 flex items-center justify-center">
                             <i class="fas fa-mug-hot text-orange-custom text-xl"></i>
@@ -325,6 +346,14 @@ usort($meals, function($a, $b) use ($pdo) {
                                 </div>
                             <?php endif; ?>
                         </div>
+                        
+                        <?php if ($order_enabled && $current_table): ?>
+                            <?php echo getOrderButtonHTML($meal['id'], $meal['name'], $meal['price']); ?>
+                        <?php elseif ($order_enabled && !$current_table): ?>
+                            <div class="text-center text-xs text-gray-500 mt-2">
+                                <i class="fas fa-qrcode"></i> <?php echo t('scan_qr_to_order'); ?>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -374,6 +403,15 @@ usort($meals, function($a, $b) use ($pdo) {
             window.location.href = url.toString();
         }
     </script>
+    
+    <?php if ($order_enabled && $current_table): ?>
+        <?php echo getOrderSidebarHTML(); ?>
+        <?php echo getOrderJavaScript(); ?>
+    <?php elseif ($order_enabled && !$current_table): ?>
+        <div class="fixed bottom-4 right-4 bg-orange-custom text-white p-4 rounded-full shadow-lg z-40">
+            <i class="fas fa-qrcode text-xl"></i>
+        </div>
+    <?php endif; ?>
     
     <?php echo getThemeScript(); ?>
 </body>
