@@ -1,27 +1,14 @@
 <?php
-// Theme handling - Complete file for both public and admin
+// Theme handling - NO cookie setting here, only reading
 
 function getCurrentTheme() {
-    // Check URL parameter first
-    if (isset($_GET['theme'])) {
-        $theme = $_GET['theme'];
-        // Set cookie immediately when URL parameter is present
-        setcookie('user_theme', $theme, time() + (86400 * 30), "/", "", false, true);
-        $_SESSION['user_theme'] = $theme;
-        return $theme;
-    }
-    
-    // Then check cookie
+    // Only READ from cookie/session, never WRITE
     if (isset($_COOKIE['user_theme'])) {
         return $_COOKIE['user_theme'];
     }
-    
-    // Then check session
     if (isset($_SESSION['user_theme'])) {
         return $_SESSION['user_theme'];
     }
-    
-    // Default to light
     return 'light';
 }
 
@@ -94,7 +81,6 @@ function getThemeScript() {
                     document.documentElement.setAttribute("data-theme", newTheme);
                     localStorage.setItem("theme", newTheme);
                     
-                    // Reload page to let PHP set the cookie
                     const url = new URL(window.location.href);
                     url.searchParams.set("theme", newTheme);
                     window.location.href = url.toString();
@@ -102,7 +88,6 @@ function getThemeScript() {
             }
         }
         
-        // Set initial theme from HTML attribute
         const initialTheme = document.documentElement.getAttribute("data-theme");
         if (initialTheme) {
             localStorage.setItem("theme", initialTheme);
