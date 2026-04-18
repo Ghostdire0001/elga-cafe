@@ -235,7 +235,6 @@ $page_title = $page_title ?? 'Admin Dashboard';
             background-color: var(--bg-primary);
         }
         
-        /* Stats cards */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -379,9 +378,12 @@ $page_title = $page_title ?? 'Admin Dashboard';
                 <a href="discounts.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'discounts.php' ? 'active' : ''; ?>">
                     <i class="fas fa-tag"></i> <?php echo t('discounts'); ?>
                 </a>
-<a href="settings.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active' : ''; ?>">
-    <i class="fas fa-cog"></i> <?php echo t('settings'); ?>
-</a>
+                <a href="settings.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-cog"></i> <?php echo t('settings'); ?>
+                </a>
+                <a href="generate-table-qrcodes.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'generate-table-qrcodes.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-qrcode"></i> <?php echo t('table_qr_codes'); ?>
+                </a>
                 <a href="logout.php" class="logout">
                     <i class="fas fa-sign-out-alt"></i> <?php echo t('logout'); ?>
                 </a>
