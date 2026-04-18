@@ -12,7 +12,7 @@ $translations = [
         // Common
         'site_name' => 'ኤልጋ ካፌ',
         'dark_mode' => 'ጨለማ ሁነታ',
-        'light_mode' => 'ብርሃን ၜነታ',
+        'light_mode' => 'ብርሃን ሁነታ',
         'language' => 'ቋንቋ',
         'logout' => 'ውጣ',
         'dashboard' => 'ዳሽቦርድ',
@@ -20,6 +20,8 @@ $translations = [
         'categories' => 'ምድቦች',
         'dietary_labels' => 'የአመጋገብ መለያዎች',
         'discounts' => 'ቅናሾች',
+        'settings' => 'ቅንብሮች',
+        'table_qr_codes' => 'የጠረጴዛ QR ኮዶች',
         'welcome_back' => 'እንኳን ደህና መጡ',
         'view_website' => 'ድረ-ገፁን ይመልከቱ',
         'copyright' => 'መብቱ በህግ የተጠበቀ ነው',
@@ -41,6 +43,19 @@ $translations = [
         'min' => 'ደቂቃ',
         'cal' => 'ካሎሪ',
         'made_with_love' => 'በፍቅር የተዘጋጀ',
+        'scan_qr_to_order' => 'ለማዘዝ የጠረጴዛ QR ኮድ ይቃኙ',
+        
+        // Order specific
+        'your_order' => 'የእርስዎ ትዕዛዝ',
+        'your_cart_empty' => 'የእርስዎ ካርታ ባዶ ነው',
+        'subtotal' => 'ንዑስ ድምር',
+        'place_order' => 'ትዕዛዝ አስገባ',
+        'your_name_optional' => 'ስምዎ (አማራጭ)',
+        'add_to_order' => 'ለትእዛዝ ጨምር',
+        'table' => 'ጠረጴዛ',
+        'order_placed_success' => 'ትዕዛዝዎ በተሳካ ሁኔታ ቀርቧል! ምግብዎ ወደ ጠረጴዛዎ ይደርሳል',
+        'error_placing_order' => 'ትዕዛዝ በማስገባት ላይ ስህተት',
+        'cart_empty_error' => 'የእርስዎ ካርታ ባዶ ነው!',
         
         // Admin specific
         'admin_panel' => 'አስተዳዳሪ ፓነል',
@@ -68,6 +83,14 @@ $translations = [
         'status' => 'ሁኔታ',
         'available' => 'አለ',
         'unavailable' => 'የለም',
+        'system_settings' => 'የስርዓት ቅንብሮች',
+        'order_feature_enabled' => 'የመስመር ላይ ትዕዛዝ አግድም',
+        'order_minimum_amount' => 'ዝቅተኛ የትዕዛዝ መጠን',
+        'order_preparation_time' => 'የዝግጅት ጊዜ',
+        'order_max_items_per_order' => 'በአንድ ትዕዛዝ ከፍተኛ እቃዎች',
+        'enable_online_ordering' => 'የመስመር ላይ ትዕዛዝ ስርዓት አንቃ',
+        'minimum_order_amount_desc' => 'ደንበኛ ትዕዛዝ ከማስገባቱ በፊት ዝቅተኛው ጠቅላላ',
+        'preparation_time_desc' => 'ለትዕዛዝ ማጠናቀቅ የሚገመት ጊዜ',
     ],
     'en' => [
         // Common
@@ -81,6 +104,8 @@ $translations = [
         'categories' => 'Categories',
         'dietary_labels' => 'Dietary Labels',
         'discounts' => 'Discounts',
+        'settings' => 'Settings',
+        'table_qr_codes' => 'Table QR Codes',
         'welcome_back' => 'Welcome back',
         'view_website' => 'View Website',
         'copyright' => 'All rights reserved',
@@ -102,6 +127,19 @@ $translations = [
         'min' => 'min',
         'cal' => 'cal',
         'made_with_love' => 'Made with love',
+        'scan_qr_to_order' => 'Scan table QR code to order',
+        
+        // Order specific
+        'your_order' => 'Your Order',
+        'your_cart_empty' => 'Your cart is empty',
+        'subtotal' => 'Subtotal',
+        'place_order' => 'Place Order',
+        'your_name_optional' => 'Your name (optional)',
+        'add_to_order' => 'Add to Order',
+        'table' => 'Table',
+        'order_placed_success' => 'Order placed successfully! Your food will be brought to your table shortly.',
+        'error_placing_order' => 'Error placing order',
+        'cart_empty_error' => 'Your cart is empty!',
         
         // Admin specific
         'admin_panel' => 'Admin Panel',
@@ -129,6 +167,14 @@ $translations = [
         'status' => 'Status',
         'available' => 'Available',
         'unavailable' => 'Unavailable',
+        'system_settings' => 'System Settings',
+        'order_feature_enabled' => 'Enable Online Ordering',
+        'order_minimum_amount' => 'Minimum Order Amount',
+        'order_preparation_time' => 'Preparation Time',
+        'order_max_items_per_order' => 'Maximum Items Per Order',
+        'enable_online_ordering' => 'Enable Online Ordering System',
+        'minimum_order_amount_desc' => 'Minimum total before customer can place order',
+        'preparation_time_desc' => 'Estimated time for order completion',
     ],
     'so' => [
         // Common
@@ -142,6 +188,8 @@ $translations = [
         'categories' => 'Qaybaha',
         'dietary_labels' => 'Cuntooyinka',
         'discounts' => 'Dhimisyada',
+        'settings' => 'Dejinta',
+        'table_qr_codes' => 'Koodhadhka QR ee Miiska',
         'welcome_back' => 'Soo dhawoow',
         'view_website' => 'Bogga Eeg',
         'copyright' => 'Dhamaan xuquuqaha way dhawrsan yihiin',
@@ -163,6 +211,19 @@ $translations = [
         'min' => 'daqiiqo',
         'cal' => 'kalori',
         'made_with_love' => 'Jacayl laga sameeyay',
+        'scan_qr_to_order' => 'Isku qaad QR code-ka miiska si aad u dalbato',
+        
+        // Order specific
+        'your_order' => 'Dalabkaaga',
+        'your_cart_empty' => 'Gaarigaaga waa maran yahay',
+        'subtotal' => 'Wadarta hoose',
+        'place_order' => 'Dalab dhig',
+        'your_name_optional' => 'Magacaaga (ikhtiyaar)',
+        'add_to_order' => 'Ku dar Dalabka',
+        'table' => 'Miis',
+        'order_placed_success' => 'Dalabka si guul leh ayaa loo dhigay! Cuntadaada waxa la keenayaa miiskaaga si dhakhso ah.',
+        'error_placing_order' => 'Khalad dhigtay dalabka',
+        'cart_empty_error' => 'Gaarigaaga waa maran yahay!',
         
         // Admin specific
         'admin_panel' => 'Guddoomiyaha',
@@ -190,6 +251,14 @@ $translations = [
         'status' => 'Xaalad',
         'available' => 'La heli kara',
         'unavailable' => 'La heli karin',
+        'system_settings' => 'Dejinta Nidaamka',
+        'order_feature_enabled' => 'Dhaqaaji Dalabka Khadka Tooska ah',
+        'order_minimum_amount' => 'Qadarka Ugu Yar ee Dalabka',
+        'order_preparation_time' => 'Waqtiga Diyaarinta',
+        'order_max_items_per_order' => 'Alaabta Ugu Badan ee Dalabka',
+        'enable_online_ordering' => 'Dhaqaaji Nidaamka Dalabka Khadka Tooska ah',
+        'minimum_order_amount_desc' => 'Wadarta ugu yar kahor inta macaamilku dalabka dhigayo',
+        'preparation_time_desc' => 'Waqtiga lagu qiyaasay dhammaystirka dalabka',
     ],
     'om' => [
         // Common
@@ -203,6 +272,8 @@ $translations = [
         'categories' => 'Ramaddii',
         'dietary_labels' => 'Mallattoo Nyaataa',
         'discounts' => 'Hirmaata',
+        'settings' => 'Qindaa’ina',
+        'table_qr_codes' => 'Koodii QR Meezii',
         'welcome_back' => 'Baga nagaan dhufte',
         'view_website' => 'Marsariitii ilaali',
         'copyright' => 'Mirgiin hundaa eeggama',
@@ -224,6 +295,19 @@ $translations = [
         'min' => 'daqiiqo',
         'cal' => 'kalaarii',
         'made_with_love' => 'Jaalalaan qopheeffame',
+        'scan_qr_to_order' => 'Koodii QR meezii iskaanii ajajuu',
+        
+        // Order specific
+        'your_order' => 'Ajaja Keessan',
+        'your_cart_empty' => 'Gaarii keessan duwwaa',
+        'subtotal' => 'Idaamuu gadhee',
+        'place_order' => 'Ajaja Godhaa',
+        'your_name_optional' => 'Maqaa keessan (filmaata)',
+        'add_to_order' => 'Ajaja Irratti Dabali',
+        'table' => 'Meeza',
+        'order_placed_success' => 'Ajajni keessan milkaa’inaan godhame! Nyaatni keessan meeza keessanitti fudhatee ni dhufa.',
+        'error_placing_order' => 'Ajaja godhutti dogoggorri uume',
+        'cart_empty_error' => 'Gaarii keessan duwwaa!',
         
         // Admin specific
         'admin_panel' => 'Bulchiinsaa',
@@ -251,6 +335,14 @@ $translations = [
         'status' => 'Haala',
         'available' => 'Argama',
         'unavailable' => 'Hin Argamu',
+        'system_settings' => 'Qindaa’ina Sirnaa',
+        'order_feature_enabled' => 'Sirna Ajajuu Sararaa Dhaabuu',
+        'order_minimum_amount' => 'Idaamuu Ajajaa Gadhee',
+        'order_preparation_time' => 'Yeroo Qopheessuu',
+        'order_max_items_per_order' => 'Meeshaalee Ajaja Keessatti Baay’inaan',
+        'enable_online_ordering' => 'Sirna Ajajuu Sararaa Dhaabuu',
+        'minimum_order_amount_desc' => 'Idaamuun xiqqaan maamilaan ajaja ergu dura',
+        'preparation_time_desc' => 'Yeroo tilmaamamee ajajni xumuramuuf',
     ]
 ];
 ?>
