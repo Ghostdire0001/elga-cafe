@@ -1,10 +1,15 @@
 <?php
 session_start();
 
-// If already logged in as admin, redirect to dashboard
-if(isset($_SESSION['user_id']) && in_array($_SESSION['user_role'], ['admin', 'manager'])) {
-    header('Location: admin/dashboard.php');
-    exit();
+// If already logged in, redirect based on role
+if(isset($_SESSION['user_id'])) {
+    if($_SESSION['user_role'] == 'waiter') {
+        header('Location: ../waiter/dashboard.php');
+        exit();
+    } elseif (in_array($_SESSION['user_role'], ['admin', 'manager'])) {
+        header('Location: dashboard.php');
+        exit();
+    }
 }
 
 require_once '../includes/config.php';
@@ -15,7 +20,8 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username']);
     $password = $_POST['password'];
     
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? AND role IN ('admin', 'manager') AND is_active = 1");
+    // Allow admin, manager, AND waiter roles
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? AND role IN ('admin', 'manager', 'waiter') AND is_active = 1");
     $stmt->execute([$username]);
     $user = $stmt->fetch();
     
@@ -27,7 +33,12 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
         $stmt->execute([$user['id']]);
         
-        header('Location: dashboard.php');
+        // Redirect based on role
+        if($user['role'] == 'waiter') {
+            header('Location: ../waiter/dashboard.php');
+        } else {
+            header('Location: dashboard.php');
+        }
         exit();
     } else {
         $error = 'Invalid username or password';
@@ -39,7 +50,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - Elga Cafe</title>
+    <title>Login - Elga Cafe</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -54,8 +65,8 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="bg-orange-custom text-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-utensils text-3xl"></i>
                 </div>
-                <h2 class="text-2xl font-bold text-gray-800">Elga Cafe Admin</h2>
-                <p class="text-gray-600 mt-2">Please login to access the dashboard</p>
+                <h2 class="text-2xl font-bold text-gray-800">Elga Cafe</h2>
+                <p class="text-gray-600 mt-2">Please login to continue</p>
             </div>
             
             <?php if($error): ?>
@@ -89,7 +100,12 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
             
             <div class="mt-6 text-center text-sm text-gray-500">
-                <i class="fas fa-shield-alt mr-1"></i> Secure Admin Area
+                <i class="fas fa-shield-alt mr-1"></i> 
+                <?php if(isset($_GET['role']) && $_GET['role'] == 'waiter'): ?>
+                    Waiter Login
+                <?php else: ?>
+                    Staff Login
+                <?php endif; ?>
             </div>
         </div>
     </div>
