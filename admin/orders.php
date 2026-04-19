@@ -10,7 +10,7 @@ $current_theme = getCurrentTheme();
 
 // Check if user has access (admin or manager)
 if(!isset($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['admin', 'manager'])) {
-    header('Location: login.php');
+    header('Location: index.php');
     exit();
 }
 
