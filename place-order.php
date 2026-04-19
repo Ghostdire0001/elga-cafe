@@ -14,10 +14,11 @@ if (!$data || !isset($data['cart']) || !isset($data['table'])) {
 
 $table_number = $data['table'];
 $cart_items = $data['cart'];
-$customer_name = isset($data['customer_name']) ? $data['customer_name'] : 'Guest';
+$customer_name = $data['customer_name'] ?? 'Guest';
 $subtotal = $data['subtotal'];
+$order_source = $data['order_source'] ?? 'customer';
 
-$order_id = placeOrder($pdo, $table_number, $customer_name, $cart_items, $subtotal);
+$order_id = requestOrder($pdo, $table_number, $customer_name, $cart_items, $subtotal, $order_source);
 
 if ($order_id) {
     echo json_encode(['success' => true, 'order_id' => $order_id]);
