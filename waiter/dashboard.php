@@ -8,21 +8,51 @@ require_once '../includes/order-functions.php';
 
 // Check if user is logged in as waiter
 if(!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'waiter') {
-    header('Location: ../admin/login.php');
+    header('Location: ../admin/index.php');
     exit();
 }
 
 $current_lang = getCurrentLanguage();
 $current_theme = getCurrentTheme();
 
-// Get waiter info
+// Get waiter info with error handling
 $stmt = $pdo->prepare("SELECT w.*, u.username, u.full_name FROM waiters w JOIN users u ON w.user_id = u.id WHERE w.user_id = ?");
 $stmt->execute([$_SESSION['user_id']]);
 $waiter = $stmt->fetch();
 
+// If waiter not found in waiters table, create a default entry
+if (!$waiter) {
+    // Check if user exists
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $user = $stmt->fetch();
+    
+    if ($user) {
+        // Create waiter entry with default assigned tables (1-5)
+        $stmt = $pdo->prepare("INSERT INTO waiters (user_id, assigned_tables, is_active) VALUES (?, 'TABLE_01,TABLE_02,TABLE_03,TABLE_04,TABLE_05', 1)");
+        $stmt->execute([$_SESSION['user_id']]);
+        
+        // Fetch the newly created waiter record
+        $stmt = $pdo->prepare("SELECT w.*, u.username, u.full_name FROM waiters w JOIN users u ON w.user_id = u.id WHERE w.user_id = ?");
+        $stmt->execute([$_SESSION['user_id']]);
+        $waiter = $stmt->fetch();
+    }
+}
+
+// Safely get assigned tables
+$assigned_tables = [];
+if ($waiter && isset($waiter['assigned_tables']) && $waiter['assigned_tables'] !== null) {
+    $assigned_tables = explode(',', $waiter['assigned_tables']);
+}
+
 // Get pending requests for this waiter's tables
-$pending_requests = getPendingRequests($pdo, $waiter['id']);
-$active_orders = getActiveOrders($pdo, $waiter['id']);
+$pending_requests = [];
+$active_orders = [];
+
+if (!empty($assigned_tables)) {
+    $pending_requests = getPendingRequests($pdo, $waiter['id'] ?? null);
+    $active_orders = getActiveOrders($pdo, $waiter['id'] ?? null);
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo $current_lang; ?>" data-theme="<?php echo $current_theme; ?>">
@@ -67,10 +97,13 @@ $active_orders = getActiveOrders($pdo, $waiter['id']);
             <div class="flex justify-between items-center">
                 <div>
                     <h1 class="text-xl font-bold">Elga Cafe - Waiter Panel</h1>
-                    <p class="text-orange-100 text-sm">Welcome, <?php echo htmlspecialchars($waiter['full_name']); ?></p>
+                    <p class="text-orange-100 text-sm">Welcome, <?php echo htmlspecialchars($waiter['full_name'] ?? $_SESSION['username'] ?? 'Waiter'); ?></p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <a href="../admin/logout.php" class="bg-white text-orange-custom px-4 py-1 rounded-lg text-sm">
+                    <a href="../index.php" class="bg-white text-orange-custom px-3 py-1 rounded-lg text-sm hover:bg-orange-100 transition">
+                        <i class="fas fa-utensils"></i> Menu
+                    </a>
+                    <a href="../admin/logout.php" class="bg-white text-orange-custom px-3 py-1 rounded-lg text-sm hover:bg-orange-100 transition">
                         <i class="fas fa-sign-out-alt"></i> Logout
                     </a>
                 </div>
@@ -83,13 +116,15 @@ $active_orders = getActiveOrders($pdo, $waiter['id']);
         <div class="bg-white rounded-lg shadow p-4 mb-6" style="background-color: var(--card-bg);">
             <h2 class="font-bold mb-2"><i class="fas fa-table text-orange-custom"></i> Your Assigned Tables</h2>
             <div class="flex flex-wrap gap-2">
-                <?php 
-                $tables = explode(',', $waiter['assigned_tables']);
-                foreach($tables as $table): ?>
-                    <span class="px-3 py-1 bg-orange-100 text-orange-custom rounded-full text-sm">
-                        <?php echo str_replace('TABLE_', 'Table ', $table); ?>
-                    </span>
-                <?php endforeach; ?>
+                <?php if (empty($assigned_tables)): ?>
+                    <span class="text-gray-500 text-sm">No tables assigned yet. Please contact administrator.</span>
+                <?php else: ?>
+                    <?php foreach($assigned_tables as $table): ?>
+                        <span class="px-3 py-1 bg-orange-100 text-orange-custom rounded-full text-sm">
+                            <?php echo str_replace('TABLE_', 'Table ', $table); ?>
+                        </span>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -111,12 +146,13 @@ $active_orders = getActiveOrders($pdo, $waiter['id']);
             
             <?php foreach($pending_requests as $request): 
                 $details = getOrderDetails($pdo, $request['id']);
+                if (!$details) continue;
             ?>
                 <div class="bg-white rounded-lg shadow overflow-hidden" style="background-color: var(--card-bg);">
                     <div class="p-4 border-b" style="border-color: var(--border-color);">
                         <div class="flex justify-between items-center">
                             <h3 class="font-bold text-lg">
-                                <?php echo str_replace('TABLE_', 'Table ', $request['table_number']); ?>
+                                <?php echo str_replace('TABLE_', 'Table ', $request['table_number'] ?? 'Unknown'); ?>
                             </h3>
                             <span class="status-pending px-2 py-1 rounded text-xs font-semibold">
                                 <i class="fas fa-hourglass-half"></i> Pending
@@ -127,17 +163,21 @@ $active_orders = getActiveOrders($pdo, $waiter['id']);
                         </p>
                     </div>
                     <div class="p-4">
-                        <?php foreach($details['items'] as $item): ?>
-                            <div class="flex justify-between text-sm mb-1">
-                                <span><?php echo $item['quantity']; ?>x <?php echo htmlspecialchars($item['meal_name']); ?></span>
-                                <span>$<?php echo number_format($item['quantity'] * $item['unit_price'], 2); ?></span>
-                            </div>
-                        <?php endforeach; ?>
+                        <?php if (isset($details['items']) && !empty($details['items'])): ?>
+                            <?php foreach($details['items'] as $item): ?>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span><?php echo $item['quantity']; ?>x <?php echo htmlspecialchars($item['meal_name'] ?? 'Unknown'); ?></span>
+                                    <span>$<?php echo number_format($item['quantity'] * $item['unit_price'], 2); ?></span>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <p class="text-gray-500 text-sm">No items found</p>
+                        <?php endif; ?>
                         <div class="border-t mt-2 pt-2 flex justify-between font-bold">
                             <span>Total:</span>
-                            <span class="text-orange-custom">$<?php echo number_format($request['total_amount'], 2); ?></span>
+                            <span class="text-orange-custom">$<?php echo number_format($request['total_amount'] ?? 0, 2); ?></span>
                         </div>
-                        <?php if($request['customer_name']): ?>
+                        <?php if(!empty($request['customer_name'])): ?>
                             <p class="text-sm text-gray-500 mt-2"><i class="fas fa-user"></i> <?php echo htmlspecialchars($request['customer_name']); ?></p>
                         <?php endif; ?>
                     </div>
@@ -168,31 +208,37 @@ $active_orders = getActiveOrders($pdo, $waiter['id']);
             
             <?php foreach($active_orders as $order): 
                 $details = getOrderDetails($pdo, $order['id']);
+                if (!$details) continue;
             ?>
                 <div class="bg-white rounded-lg shadow overflow-hidden" style="background-color: var(--card-bg);">
                     <div class="p-4 border-b" style="border-color: var(--border-color);">
                         <div class="flex justify-between items-center">
                             <h3 class="font-bold text-lg">
-                                <?php echo str_replace('TABLE_', 'Table ', $order['table_number']); ?>
+                                <?php echo str_replace('TABLE_', 'Table ', $order['table_number'] ?? 'Unknown'); ?>
                             </h3>
-                            <span class="status-<?php echo $order['status']; ?> px-2 py-1 rounded text-xs font-semibold">
-                                <?php echo ucfirst($order['status']); ?>
+                            <span class="status-<?php echo $order['status'] ?? 'pending'; ?> px-2 py-1 rounded text-xs font-semibold">
+                                <?php echo ucfirst($order['status'] ?? 'Pending'); ?>
                             </span>
                         </div>
                         <p class="text-sm text-gray-500 mt-1">
-                            <i class="fas fa-check-circle text-green-500"></i> Confirmed at <?php echo date('h:i A', strtotime($order['confirmed_at'])); ?>
+                            <i class="fas fa-check-circle text-green-500"></i> 
+                            Confirmed at <?php echo date('h:i A', strtotime($order['confirmed_at'] ?? $order['created_at'])); ?>
                         </p>
                     </div>
                     <div class="p-4">
-                        <?php foreach($details['items'] as $item): ?>
-                            <div class="flex justify-between text-sm mb-1">
-                                <span><?php echo $item['quantity']; ?>x <?php echo htmlspecialchars($item['meal_name']); ?></span>
-                                <span>$<?php echo number_format($item['quantity'] * $item['unit_price'], 2); ?></span>
-                            </div>
-                        <?php endforeach; ?>
+                        <?php if (isset($details['items']) && !empty($details['items'])): ?>
+                            <?php foreach($details['items'] as $item): ?>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span><?php echo $item['quantity']; ?>x <?php echo htmlspecialchars($item['meal_name'] ?? 'Unknown'); ?></span>
+                                    <span>$<?php echo number_format($item['quantity'] * $item['unit_price'], 2); ?></span>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <p class="text-gray-500 text-sm">No items found</p>
+                        <?php endif; ?>
                         <div class="border-t mt-2 pt-2 flex justify-between font-bold">
                             <span>Total:</span>
-                            <span class="text-orange-custom">$<?php echo number_format($order['total_amount'], 2); ?></span>
+                            <span class="text-orange-custom">$<?php echo number_format($order['total_amount'] ?? 0, 2); ?></span>
                         </div>
                     </div>
                     <div class="p-4 bg-gray-50 flex gap-2" style="background-color: var(--bg-secondary);">
@@ -218,8 +264,12 @@ $active_orders = getActiveOrders($pdo, $waiter['id']);
                     if(data.success) {
                         location.reload();
                     } else {
-                        alert('Error: ' + data.message);
+                        alert('Error: ' + (data.message || 'Unknown error'));
                     }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error confirming order');
                 });
             }
         }
@@ -237,8 +287,12 @@ $active_orders = getActiveOrders($pdo, $waiter['id']);
                     if(data.success) {
                         location.reload();
                     } else {
-                        alert('Error: ' + data.message);
+                        alert('Error: ' + (data.message || 'Unknown error'));
                     }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error rejecting order');
                 });
             }
         }
@@ -257,8 +311,12 @@ $active_orders = getActiveOrders($pdo, $waiter['id']);
                 if(data.success) {
                     location.reload();
                 } else {
-                    alert('Error: ' + data.message);
+                    alert('Error: ' + (data.message || 'Unknown error'));
                 }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error marking order as paid');
             });
         }
     </script>
