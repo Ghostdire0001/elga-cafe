@@ -1,6 +1,10 @@
 <?php
 // Order system functions with waiter gateway support
 
+// ============================================
+// CORE FUNCTIONS
+// ============================================
+
 function getTableNumber() {
     if (isset($_GET['table'])) {
         $table = preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['table']);
@@ -17,7 +21,7 @@ function getTableNumber() {
     return null;
 }
 
-function getCurrentWaiter() {
+function getCurrentWaiter($pdo) {
     if (isset($_SESSION['user_id']) && isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'waiter') {
         $stmt = $pdo->prepare("SELECT * FROM waiters WHERE user_id = ?");
         $stmt->execute([$_SESSION['user_id']]);
@@ -36,6 +40,38 @@ function isWaiterAssignedToTable($pdo, $waiter_id, $table_number) {
     }
     return false;
 }
+
+// ============================================
+// CART FUNCTIONS (Database)
+// ============================================
+
+function saveCartToDatabase($pdo, $table_number, $session_id, $cart_items, $subtotal) {
+    $items_json = json_encode($cart_items);
+    $stmt = $pdo->prepare("INSERT INTO active_carts (table_number, session_id, items, subtotal, updated_at) 
+                           VALUES (?, ?, ?, ?, NOW()) 
+                           ON DUPLICATE KEY UPDATE 
+                           items = ?, subtotal = ?, updated_at = NOW()");
+    $stmt->execute([$table_number, $session_id, $items_json, $subtotal, $items_json, $subtotal]);
+}
+
+function getCartFromDatabase($pdo, $table_number, $session_id) {
+    $stmt = $pdo->prepare("SELECT items, subtotal FROM active_carts 
+                           WHERE table_number = ? AND session_id = ?");
+    $stmt->execute([$table_number, $session_id]);
+    $result = $stmt->fetch();
+    
+    if ($result) {
+        return [
+            'items' => json_decode($result['items'], true),
+            'subtotal' => floatval($result['subtotal'])
+        ];
+    }
+    return ['items' => [], 'subtotal' => 0];
+}
+
+// ============================================
+// ORDER FUNCTIONS
+// ============================================
 
 function requestOrder($pdo, $table_number, $customer_name, $cart_items, $subtotal, $order_source = 'customer') {
     try {
@@ -70,7 +106,7 @@ function confirmOrder($pdo, $order_id, $waiter_id) {
 }
 
 function rejectOrder($pdo, $order_id, $reason) {
-    $stmt = $pdo->prepare("UPDATE orders SET request_status = 'rejected', rejection_reason = ? WHERE id = ?");
+    $stmt = $pdo->prepare("UPDATE orders SET request_status = 'rejected', rejection_reason = ?, status = 'cancelled' WHERE id = ?");
     return $stmt->execute([$reason, $order_id]);
 }
 
@@ -148,7 +184,10 @@ function getOrderDetails($pdo, $order_id) {
     return $order;
 }
 
-// HTML Components
+// ============================================
+// HTML COMPONENTS
+// ============================================
+
 function getWaiterOrderButtonHTML($meal_id, $meal_name, $meal_price) {
     return '
     <button class="waiter-add-to-cart-btn w-full mt-2 bg-orange-custom text-white py-2 rounded-lg hover:bg-orange-600 transition flex items-center justify-center gap-2"
@@ -156,7 +195,7 @@ function getWaiterOrderButtonHTML($meal_id, $meal_name, $meal_price) {
             data-meal-name="' . htmlspecialchars($meal_name) . '"
             data-meal-price="' . $meal_price . '">
         <i class="fas fa-cart-plus"></i>
-        Add to Order (Waiter Mode)
+        Add for Table
     </button>';
 }
 
@@ -173,7 +212,7 @@ function getCustomerOrderButtonHTML($meal_id, $meal_name, $meal_price) {
 
 function getWaiterSidebarHTML() {
     return '
-    <div id="order-sidebar" class="fixed right-0 top-0 h-full w-full sm:w-96 bg-white shadow-xl z-50 transform translate-x-full transition-transform duration-300" style="background-color: var(--card-bg);">
+    <div id="waiter-order-sidebar" class="fixed right-0 top-0 h-full w-full sm:w-96 bg-white shadow-xl z-50 transform translate-x-full transition-transform duration-300" style="background-color: var(--card-bg);">
         <div class="p-4 border-b" style="border-color: var(--border-color);">
             <div class="flex justify-between items-center">
                 <h2 class="text-xl font-bold">Table Order</h2>
@@ -205,21 +244,33 @@ function getWaiterSidebarHTML() {
             </button>
         </div>
     </div>
-    <div id="order-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden" onclick="toggleWaiterSidebar()"></div>';
+    <div id="waiter-order-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden" onclick="toggleWaiterSidebar()"></div>
+    <button id="waiter-cart-btn" class="fixed bottom-4 right-4 bg-orange-custom text-white p-4 rounded-full shadow-lg z-40 hover:bg-orange-600 transition">
+        <i class="fas fa-clipboard-list text-xl"></i>
+        <span id="waiter-cart-count" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
+    </button>';
 }
 
 function getWaiterOrderJavaScript() {
     return '
     <script>
         let waiterCart = [];
-        let waiterMode = ' . (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'waiter' ? 'true' : 'false') . ';
+        let selectedWaiterTable = "";
         
         function toggleWaiterSidebar() {
-            document.getElementById("order-sidebar").classList.toggle("translate-x-full");
-            document.getElementById("order-overlay").classList.toggle("hidden");
+            const sidebar = document.getElementById("waiter-order-sidebar");
+            const overlay = document.getElementById("waiter-order-overlay");
+            if (sidebar) {
+                sidebar.classList.toggle("translate-x-full");
+                overlay.classList.toggle("hidden");
+            }
         }
         
         function addToWaiterCart(mealId, mealName, mealPrice) {
+            if (!selectedWaiterTable) {
+                alert("Please select a table first");
+                return;
+            }
             const existingItem = waiterCart.find(item => item.id === mealId);
             if (existingItem) {
                 existingItem.quantity++;
@@ -232,34 +283,43 @@ function getWaiterOrderJavaScript() {
                 });
             }
             updateWaiterCartDisplay();
+            toggleWaiterSidebar();
         }
         
         function updateWaiterCartDisplay() {
             const container = document.getElementById("waiter-order-items");
+            const cartCount = document.getElementById("waiter-cart-count");
             const subtotal = waiterCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             
             if (waiterCart.length === 0) {
-                container.innerHTML = \'<p class="text-gray-500 text-center py-8">No items added</p>\';
-                document.getElementById("waiter-order-subtotal").textContent = "$0.00";
+                if (container) container.innerHTML = "<p class=\"text-gray-500 text-center py-8\">No items added</p>";
+                if (cartCount) cartCount.textContent = "0";
+                const subtotalEl = document.getElementById("waiter-order-subtotal");
+                if (subtotalEl) subtotalEl.textContent = "$0.00";
                 return;
             }
             
-            document.getElementById("waiter-order-subtotal").textContent = "$" + subtotal.toFixed(2);
+            if (cartCount) cartCount.textContent = waiterCart.reduce((sum, item) => sum + item.quantity, 0);
+            if (document.getElementById("waiter-order-subtotal")) {
+                document.getElementById("waiter-order-subtotal").textContent = "$" + subtotal.toFixed(2);
+            }
             
-            container.innerHTML = waiterCart.map(item => `
-                <div class="flex justify-between items-center mb-3 p-2 border rounded">
-                    <div>
-                        <p class="font-semibold">${item.name}</p>
-                        <p class="text-sm text-gray-500">$${item.price.toFixed(2)} x ${item.quantity}</p>
+            if (container) {
+                container.innerHTML = waiterCart.map(item => `
+                    <div class="flex justify-between items-center mb-3 p-2 border rounded" style="border-color: var(--border-color);">
+                        <div>
+                            <p class="font-semibold">${item.name}</p>
+                            <p class="text-sm text-gray-500">$${item.price.toFixed(2)} x ${item.quantity}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="updateWaiterQuantity(${item.id}, ${item.quantity - 1})" class="text-red-500">-</button>
+                            <span>${item.quantity}</span>
+                            <button onclick="updateWaiterQuantity(${item.id}, ${item.quantity + 1})" class="text-green-500">+</button>
+                            <button onclick="removeFromWaiterCart(${item.id})" class="text-red-500 ml-2">×</button>
+                        </div>
                     </div>
-                    <div class="flex gap-2">
-                        <button onclick="updateWaiterQuantity(${item.id}, ${item.quantity - 1})" class="text-red-500">-</button>
-                        <span>${item.quantity}</span>
-                        <button onclick="updateWaiterQuantity(${item.id}, ${item.quantity + 1})" class="text-green-500">+</button>
-                        <button onclick="removeFromWaiterCart(${item.id})" class="text-red-500 ml-2">×</button>
-                    </div>
-                </div>
-            `).join("");
+                `).join("");
+            }
         }
         
         function updateWaiterQuantity(mealId, newQuantity) {
@@ -280,11 +340,7 @@ function getWaiterOrderJavaScript() {
         }
         
         function submitWaiterOrder() {
-            const tableSelect = document.getElementById("waiter-table-select");
-            const tableNumber = tableSelect.value;
-            const customerName = document.getElementById("waiter-customer-name").value;
-            
-            if (!tableNumber) {
+            if (!selectedWaiterTable) {
                 alert("Please select a table");
                 return;
             }
@@ -293,6 +349,7 @@ function getWaiterOrderJavaScript() {
                 return;
             }
             
+            const customerName = document.getElementById("waiter-customer-name")?.value || "";
             const subtotal = waiterCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             
             fetch("/place-order.php", {
@@ -300,7 +357,7 @@ function getWaiterOrderJavaScript() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     cart: waiterCart,
-                    table: tableNumber,
+                    table: selectedWaiterTable,
                     customer_name: customerName,
                     subtotal: subtotal,
                     order_source: "waiter"
@@ -309,58 +366,52 @@ function getWaiterOrderJavaScript() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert("Order requested for " + tableNumber.replace("TABLE_", "Table ") + "!");
+                    alert("Order requested for " + selectedWaiterTable.replace("TABLE_", "Table ") + "!");
                     waiterCart = [];
                     updateWaiterCartDisplay();
                     toggleWaiterSidebar();
-                    location.reload();
                 } else {
                     alert("Error: " + data.message);
                 }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("Error placing order. Please try again.");
             });
         }
         
-        // Load tables for waiter
-        if (waiterMode) {
-            fetch("/get-waiter-tables.php")
-                .then(response => response.json())
-                .then(data => {
-                    const select = document.getElementById("waiter-table-select");
-                    if (data.tables) {
-                        data.tables.forEach(table => {
-                            const option = document.createElement("option");
-                            option.value = table;
-                            option.textContent = table.replace("TABLE_", "Table ");
-                            select.appendChild(option);
-                        });
-                    }
-                });
+        function setWaiterTable(table) {
+            selectedWaiterTable = table;
+            document.querySelectorAll(".waiter-table-btn").forEach(btn => {
+                btn.classList.remove("bg-orange-custom", "text-white");
+                btn.classList.add("bg-gray-200");
+                if (btn.dataset.table === table) {
+                    btn.classList.remove("bg-gray-200");
+                    btn.classList.add("bg-orange-custom", "text-white");
+                }
+            });
+            const displayDiv = document.getElementById("selected-table-display");
+            const displaySpan = document.getElementById("selected-table-name");
+            if (displayDiv && displaySpan) {
+                displayDiv.classList.remove("hidden");
+                displaySpan.textContent = table.replace("TABLE_", "Table ");
+            }
         }
         
-        // Event listeners for add to cart buttons
-        document.addEventListener("DOMContentLoaded", function() {
-            if (waiterMode) {
-                document.querySelectorAll(".waiter-add-to-cart-btn").forEach(btn => {
-                    btn.addEventListener("click", function() {
-                        const mealId = parseInt(this.dataset.mealId);
-                        const mealName = this.dataset.mealName;
-                        const mealPrice = parseFloat(this.dataset.mealPrice);
-                        addToWaiterCart(mealId, mealName, mealPrice);
-                        toggleWaiterSidebar();
+        // Load tables for waiter
+        fetch("/get-waiter-tables.php")
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById("waiter-table-select");
+                if (data.tables && select) {
+                    data.tables.forEach(table => {
+                        const option = document.createElement("option");
+                        option.value = table;
+                        option.textContent = table.replace("TABLE_", "Table ");
+                        select.appendChild(option);
                     });
-                });
-            } else {
-                document.querySelectorAll(".customer-add-to-cart-btn").forEach(btn => {
-                    btn.addEventListener("click", function() {
-                        const mealId = parseInt(this.dataset.mealId);
-                        const mealName = this.dataset.mealName;
-                        const mealPrice = parseFloat(this.dataset.mealPrice);
-                        addToCustomerCart(mealId, mealName, mealPrice);
-                        toggleCustomerSidebar();
-                    });
-                });
-            }
-        });
+                }
+            });
     </script>';
 }
 ?>
