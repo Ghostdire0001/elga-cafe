@@ -29,6 +29,19 @@ $current_theme = getCurrentTheme();
 $order_enabled = isOrderEnabled($pdo);
 $current_table = getTableNumber();
 
+// Check if user is a waiter (for waiter-assisted ordering)
+$is_waiter = (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'waiter');
+$waiter_assigned_tables = [];
+
+if ($is_waiter) {
+    $stmt = $pdo->prepare("SELECT assigned_tables FROM waiters WHERE user_id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $waiter = $stmt->fetch();
+    if ($waiter && $waiter['assigned_tables']) {
+        $waiter_assigned_tables = explode(',', $waiter['assigned_tables']);
+    }
+}
+
 // Get filter parameters
 $category_id = isset($_GET['category']) ? (int)$_GET['category'] : null;
 $dietary_ids = isset($_GET['dietary']) ? array_map('intval', (array)$_GET['dietary']) : [];
@@ -53,16 +66,6 @@ usort($meals, function($a, $b) use ($pdo) {
     
     return 0;
 });
-
-// Load cart from database if ordering enabled
-if ($order_enabled && $current_table) {
-    $cart_data = getCartFromDatabase($pdo, $current_table, session_id());
-    $cart_items = $cart_data['items'];
-    $cart_subtotal = $cart_data['subtotal'];
-} else {
-    $cart_items = [];
-    $cart_subtotal = 0;
-}
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo $current_lang; ?>" data-theme="<?php echo $current_theme; ?>">
@@ -167,9 +170,20 @@ if ($order_enabled && $current_table) {
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
+        
+        /* Waiter mode indicator */
+        .waiter-badge {
+            background-color: #F97316;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body class="theme-transition">
+    <!-- Header -->
     <header class="bg-orange-custom text-white shadow-lg sticky top-0 z-50">
         <div class="container mx-auto px-4 py-3 md:py-4">
             <div class="flex justify-between items-center">
@@ -178,6 +192,11 @@ if ($order_enabled && $current_table) {
                     <p class="text-orange-100 text-xs md:text-sm mt-0.5"><?php echo t('tagline'); ?></p>
                 </div>
                 <div class="flex items-center gap-3">
+                    <?php if ($is_waiter): ?>
+                        <span class="waiter-badge">
+                            <i class="fas fa-user-clock"></i> Waiter Mode
+                        </span>
+                    <?php endif; ?>
                     <select id="language-selector" class="lang-selector" onchange="changeLanguage(this.value)">
                         <?php foreach($available_languages as $code => $name): ?>
                             <option value="<?php echo $code; ?>" <?php echo $current_lang == $code ? 'selected' : ''; ?>>
@@ -188,6 +207,11 @@ if ($order_enabled && $current_table) {
                     <button id="theme-toggle" class="theme-toggle text-white">
                         <i class="fas <?php echo $current_theme == 'dark' ? 'fa-sun' : 'fa-moon'; ?>"></i>
                     </button>
+                    <?php if ($is_waiter): ?>
+                        <a href="waiter/dashboard.php" class="bg-white text-orange-custom px-3 py-1 rounded-lg text-sm hover:bg-orange-100 transition">
+                            <i class="fas fa-clipboard-list"></i> Dashboard
+                        </a>
+                    <?php endif; ?>
                     <div class="hidden md:block">
                         <div class="bg-white rounded-full w-10 h-10 flex items-center justify-center">
                             <i class="fas fa-mug-hot text-orange-custom text-xl"></i>
@@ -199,6 +223,31 @@ if ($order_enabled && $current_table) {
     </header>
 
     <div class="container mx-auto px-4 py-4 md:py-6">
+        <!-- Waiter Table Selector (only visible to waiters) -->
+        <?php if ($is_waiter && $order_enabled): ?>
+        <div class="bg-white rounded-lg shadow p-4 mb-4" style="background-color: var(--card-bg);">
+            <div class="flex flex-col sm:flex-row gap-4 items-center">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-table text-orange-custom"></i>
+                    <span class="font-semibold">Order for Table:</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <?php foreach($waiter_assigned_tables as $table): ?>
+                        <button onclick="setWaiterTable('<?php echo $table; ?>')" 
+                                class="waiter-table-btn px-4 py-2 bg-gray-200 rounded-lg hover:bg-orange-custom hover:text-white transition"
+                                data-table="<?php echo $table; ?>">
+                            <?php echo str_replace('TABLE_', 'Table ', $table); ?>
+                        </button>
+                    <?php endforeach; ?>
+                </div>
+                <div id="selected-table-display" class="text-sm text-gray-500 hidden">
+                    <i class="fas fa-check-circle text-green-500"></i> 
+                    Selected: <span id="selected-table-name"></span>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <form method="GET" action="" id="filterForm" class="filters-container p-4 mb-4">
             <div class="flex flex-col md:flex-row gap-3">
                 <div class="flex-1">
@@ -347,12 +396,29 @@ if ($order_enabled && $current_table) {
                             <?php endif; ?>
                         </div>
                         
-                        <?php if ($order_enabled && $current_table): ?>
-                            <?php echo getOrderButtonHTML($meal['id'], $meal['name'], $meal['price']); ?>
-                        <?php elseif ($order_enabled && !$current_table): ?>
-                            <div class="text-center text-xs text-gray-500 mt-2">
-                                <i class="fas fa-qrcode"></i> <?php echo t('scan_qr_to_order'); ?>
-                            </div>
+                        <!-- Order Button - Different for Waiter vs Customer -->
+                        <?php if ($order_enabled): ?>
+                            <?php if ($is_waiter): ?>
+                                <button class="waiter-add-to-cart-btn w-full mt-2 bg-orange-custom text-white py-2 rounded-lg hover:bg-orange-600 transition flex items-center justify-center gap-2"
+                                        data-meal-id="<?php echo $meal['id']; ?>"
+                                        data-meal-name="<?php echo htmlspecialchars($meal['name']); ?>"
+                                        data-meal-price="<?php echo $meal['price']; ?>">
+                                    <i class="fas fa-cart-plus"></i>
+                                    Add for Table
+                                </button>
+                            <?php elseif ($current_table): ?>
+                                <button class="customer-add-to-cart-btn w-full mt-2 bg-orange-custom text-white py-2 rounded-lg hover:bg-orange-600 transition flex items-center justify-center gap-2"
+                                        data-meal-id="<?php echo $meal['id']; ?>"
+                                        data-meal-name="<?php echo htmlspecialchars($meal['name']); ?>"
+                                        data-meal-price="<?php echo $meal['price']; ?>">
+                                    <i class="fas fa-cart-plus"></i>
+                                    Add to Order
+                                </button>
+                            <?php else: ?>
+                                <div class="text-center text-xs text-gray-500 mt-2">
+                                    <i class="fas fa-qrcode"></i> <?php echo t('scan_qr_to_order'); ?>
+                                </div>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -371,7 +437,387 @@ if ($order_enabled && $current_table) {
         </div>
     </footer>
 
+    <!-- Customer Order Sidebar (for QR code customers) -->
+    <?php if ($order_enabled && $current_table && !$is_waiter): ?>
+    <div id="customer-order-sidebar" class="fixed right-0 top-0 h-full w-full sm:w-96 bg-white shadow-xl z-50 transform translate-x-full transition-transform duration-300" style="background-color: var(--card-bg);">
+        <div class="p-4 border-b" style="border-color: var(--border-color);">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xl font-bold"><?php echo t('your_order'); ?></h2>
+                <button onclick="toggleCustomerSidebar()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div id="customer-table-info" class="text-sm text-orange-custom mt-1"></div>
+        </div>
+        <div id="customer-order-items" class="flex-1 overflow-y-auto p-4" style="max-height: calc(100vh - 200px);">
+            <p class="text-gray-500 text-center py-8"><?php echo t('your_cart_empty'); ?></p>
+        </div>
+        <div class="border-t p-4" style="border-color: var(--border-color);">
+            <div class="flex justify-between mb-2">
+                <span class="font-semibold"><?php echo t('subtotal'); ?>:</span>
+                <span id="customer-order-subtotal" class="font-bold text-orange-custom">$0.00</span>
+            </div>
+            <div class="mb-3">
+                <input type="text" id="customer-name" placeholder="<?php echo t('your_name_optional'); ?>" 
+                       class="w-full px-3 py-2 border rounded-lg" style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">
+            </div>
+            <button onclick="submitCustomerOrder()" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition">
+                <i class="fas fa-check-circle"></i> <?php echo t('place_order'); ?>
+            </button>
+        </div>
+    </div>
+    <div id="customer-order-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden" onclick="toggleCustomerSidebar()"></div>
+    <button id="customer-cart-btn" class="fixed bottom-4 right-4 bg-orange-custom text-white p-4 rounded-full shadow-lg z-40 hover:bg-orange-600 transition">
+        <i class="fas fa-shopping-cart text-xl"></i>
+        <span id="customer-cart-count" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
+    </button>
+    <?php endif; ?>
+
+    <!-- Waiter Order Sidebar -->
+    <?php if ($is_waiter && $order_enabled): ?>
+    <div id="waiter-order-sidebar" class="fixed right-0 top-0 h-full w-full sm:w-96 bg-white shadow-xl z-50 transform translate-x-full transition-transform duration-300" style="background-color: var(--card-bg);">
+        <div class="p-4 border-b" style="border-color: var(--border-color);">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xl font-bold">Table Order</h2>
+                <button onclick="toggleWaiterSidebar()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="mt-2">
+                <label class="block text-sm font-medium mb-1">Select Table:</label>
+                <select id="waiter-table-select" class="w-full p-2 border rounded-lg">
+                    <option value="">-- Select Table --</option>
+                    <?php foreach($waiter_assigned_tables as $table): ?>
+                        <option value="<?php echo $table; ?>"><?php echo str_replace('TABLE_', 'Table ', $table); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+        <div id="waiter-order-items" class="flex-1 overflow-y-auto p-4" style="max-height: calc(100vh - 280px);">
+            <p class="text-gray-500 text-center py-8">No items added</p>
+        </div>
+        <div class="border-t p-4" style="border-color: var(--border-color);">
+            <div class="flex justify-between mb-2">
+                <span class="font-semibold">Subtotal:</span>
+                <span id="waiter-order-subtotal" class="font-bold text-orange-custom">$0.00</span>
+            </div>
+            <div class="mb-3">
+                <input type="text" id="waiter-customer-name" placeholder="Customer name (optional)" 
+                       class="w-full px-3 py-2 border rounded-lg">
+            </div>
+            <button onclick="submitWaiterOrder()" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition">
+                <i class="fas fa-check-circle"></i> Request Order
+            </button>
+        </div>
+    </div>
+    <div id="waiter-order-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden" onclick="toggleWaiterSidebar()"></div>
+    <button id="waiter-cart-btn" class="fixed bottom-4 right-4 bg-orange-custom text-white p-4 rounded-full shadow-lg z-40 hover:bg-orange-600 transition">
+        <i class="fas fa-clipboard-list text-xl"></i>
+        <span id="waiter-cart-count" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
+    </button>
+    <?php endif; ?>
+
     <script>
+        // ============================================
+        // Customer Order Functions (for QR code customers)
+        // ============================================
+        let customerCart = [];
+        let currentTable = '<?php echo $current_table; ?>';
+        
+        function toggleCustomerSidebar() {
+            const sidebar = document.getElementById('customer-order-sidebar');
+            const overlay = document.getElementById('customer-order-overlay');
+            if (sidebar) {
+                sidebar.classList.toggle('translate-x-full');
+                overlay.classList.toggle('hidden');
+            }
+        }
+        
+        function addToCustomerCart(mealId, mealName, mealPrice) {
+            const existingItem = customerCart.find(item => item.id === mealId);
+            if (existingItem) {
+                existingItem.quantity++;
+            } else {
+                customerCart.push({
+                    id: mealId,
+                    name: mealName,
+                    price: parseFloat(mealPrice),
+                    quantity: 1
+                });
+            }
+            updateCustomerCartDisplay();
+            saveCustomerCartToServer();
+        }
+        
+        function updateCustomerCartDisplay() {
+            const container = document.getElementById('customer-order-items');
+            const cartCount = document.getElementById('customer-cart-count');
+            const subtotal = customerCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            
+            if (customerCart.length === 0) {
+                if (container) container.innerHTML = '<p class="text-gray-500 text-center py-8"><?php echo t('your_cart_empty'); ?></p>';
+                if (cartCount) cartCount.textContent = '0';
+                const subtotalEl = document.getElementById('customer-order-subtotal');
+                if (subtotalEl) subtotalEl.textContent = '$0.00';
+                return;
+            }
+            
+            if (cartCount) cartCount.textContent = customerCart.reduce((sum, item) => sum + item.quantity, 0);
+            if (document.getElementById('customer-order-subtotal')) {
+                document.getElementById('customer-order-subtotal').textContent = '$' + subtotal.toFixed(2);
+            }
+            
+            if (container) {
+                container.innerHTML = customerCart.map(item => `
+                    <div class="flex justify-between items-center mb-3 p-2 border rounded" style="border-color: var(--border-color);">
+                        <div>
+                            <p class="font-semibold">${item.name}</p>
+                            <p class="text-sm text-gray-500">$${item.price.toFixed(2)} x ${item.quantity}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="updateCustomerQuantity(${item.id}, ${item.quantity - 1})" class="text-red-500">-</button>
+                            <span>${item.quantity}</span>
+                            <button onclick="updateCustomerQuantity(${item.id}, ${item.quantity + 1})" class="text-green-500">+</button>
+                            <button onclick="removeFromCustomerCart(${item.id})" class="text-red-500 ml-2">×</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        function updateCustomerQuantity(mealId, newQuantity) {
+            if (newQuantity <= 0) {
+                removeFromCustomerCart(mealId);
+                return;
+            }
+            const item = customerCart.find(i => i.id === mealId);
+            if (item) {
+                item.quantity = newQuantity;
+                updateCustomerCartDisplay();
+                saveCustomerCartToServer();
+            }
+        }
+        
+        function removeFromCustomerCart(mealId) {
+            customerCart = customerCart.filter(item => item.id !== mealId);
+            updateCustomerCartDisplay();
+            saveCustomerCartToServer();
+        }
+        
+        function saveCustomerCartToServer() {
+            if (!currentTable) return;
+            fetch('/save-cart.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    cart: customerCart,
+                    table: currentTable
+                })
+            }).catch(error => console.error('Error saving cart:', error));
+        }
+        
+        function loadCustomerCartFromServer() {
+            if (!currentTable) return;
+            fetch('/get-cart.php?table=' + encodeURIComponent(currentTable))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.cart && data.cart.length > 0) {
+                        customerCart = data.cart;
+                        updateCustomerCartDisplay();
+                    }
+                })
+                .catch(error => console.error('Error loading cart:', error));
+        }
+        
+        function submitCustomerOrder() {
+            if (customerCart.length === 0) {
+                alert('<?php echo t('cart_empty_error'); ?>');
+                return;
+            }
+            
+            const customerName = document.getElementById('customer-name')?.value || '';
+            const subtotal = customerCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            
+            fetch('/place-order.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    cart: customerCart,
+                    table: currentTable,
+                    customer_name: customerName,
+                    subtotal: subtotal,
+                    order_source: 'customer'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Order requested successfully! A waiter will confirm your order shortly.');
+                    customerCart = [];
+                    updateCustomerCartDisplay();
+                    toggleCustomerSidebar();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error placing order. Please try again.');
+            });
+        }
+        
+        // ============================================
+        // Waiter Order Functions
+        // ============================================
+        let waiterCart = [];
+        let selectedWaiterTable = '';
+        
+        function toggleWaiterSidebar() {
+            const sidebar = document.getElementById('waiter-order-sidebar');
+            const overlay = document.getElementById('waiter-order-overlay');
+            if (sidebar) {
+                sidebar.classList.toggle('translate-x-full');
+                overlay.classList.toggle('hidden');
+            }
+        }
+        
+        function setWaiterTable(table) {
+            selectedWaiterTable = table;
+            document.querySelectorAll('.waiter-table-btn').forEach(btn => {
+                btn.classList.remove('bg-orange-custom', 'text-white');
+                btn.classList.add('bg-gray-200');
+                if (btn.dataset.table === table) {
+                    btn.classList.remove('bg-gray-200');
+                    btn.classList.add('bg-orange-custom', 'text-white');
+                }
+            });
+            const displayDiv = document.getElementById('selected-table-display');
+            const displaySpan = document.getElementById('selected-table-name');
+            if (displayDiv && displaySpan) {
+                displayDiv.classList.remove('hidden');
+                displaySpan.textContent = table.replace('TABLE_', 'Table ');
+            }
+        }
+        
+        function addToWaiterCart(mealId, mealName, mealPrice) {
+            if (!selectedWaiterTable) {
+                alert('Please select a table first');
+                return;
+            }
+            const existingItem = waiterCart.find(item => item.id === mealId);
+            if (existingItem) {
+                existingItem.quantity++;
+            } else {
+                waiterCart.push({
+                    id: mealId,
+                    name: mealName,
+                    price: parseFloat(mealPrice),
+                    quantity: 1
+                });
+            }
+            updateWaiterCartDisplay();
+            toggleWaiterSidebar();
+        }
+        
+        function updateWaiterCartDisplay() {
+            const container = document.getElementById('waiter-order-items');
+            const cartCount = document.getElementById('waiter-cart-count');
+            const subtotal = waiterCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            
+            if (waiterCart.length === 0) {
+                if (container) container.innerHTML = '<p class="text-gray-500 text-center py-8">No items added</p>';
+                if (cartCount) cartCount.textContent = '0';
+                const subtotalEl = document.getElementById('waiter-order-subtotal');
+                if (subtotalEl) subtotalEl.textContent = '$0.00';
+                return;
+            }
+            
+            if (cartCount) cartCount.textContent = waiterCart.reduce((sum, item) => sum + item.quantity, 0);
+            if (document.getElementById('waiter-order-subtotal')) {
+                document.getElementById('waiter-order-subtotal').textContent = '$' + subtotal.toFixed(2);
+            }
+            
+            if (container) {
+                container.innerHTML = waiterCart.map(item => `
+                    <div class="flex justify-between items-center mb-3 p-2 border rounded" style="border-color: var(--border-color);">
+                        <div>
+                            <p class="font-semibold">${item.name}</p>
+                            <p class="text-sm text-gray-500">$${item.price.toFixed(2)} x ${item.quantity}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="updateWaiterQuantity(${item.id}, ${item.quantity - 1})" class="text-red-500">-</button>
+                            <span>${item.quantity}</span>
+                            <button onclick="updateWaiterQuantity(${item.id}, ${item.quantity + 1})" class="text-green-500">+</button>
+                            <button onclick="removeFromWaiterCart(${item.id})" class="text-red-500 ml-2">×</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        function updateWaiterQuantity(mealId, newQuantity) {
+            if (newQuantity <= 0) {
+                removeFromWaiterCart(mealId);
+                return;
+            }
+            const item = waiterCart.find(i => i.id === mealId);
+            if (item) {
+                item.quantity = newQuantity;
+                updateWaiterCartDisplay();
+            }
+        }
+        
+        function removeFromWaiterCart(mealId) {
+            waiterCart = waiterCart.filter(item => item.id !== mealId);
+            updateWaiterCartDisplay();
+        }
+        
+        function submitWaiterOrder() {
+            if (!selectedWaiterTable) {
+                alert('Please select a table');
+                return;
+            }
+            if (waiterCart.length === 0) {
+                alert('Please add items to the order');
+                return;
+            }
+            
+            const customerName = document.getElementById('waiter-customer-name')?.value || '';
+            const subtotal = waiterCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            
+            fetch('/place-order.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    cart: waiterCart,
+                    table: selectedWaiterTable,
+                    customer_name: customerName,
+                    subtotal: subtotal,
+                    order_source: 'waiter'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Order requested for ' + selectedWaiterTable.replace('TABLE_', 'Table ') + '!');
+                    waiterCart = [];
+                    updateWaiterCartDisplay();
+                    toggleWaiterSidebar();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error placing order. Please try again.');
+            });
+        }
+        
+        // ============================================
+        // General Functions
+        // ============================================
+        
+        // Auto-submit filters
         document.getElementById('category')?.addEventListener('change', function() {
             document.getElementById('filterForm').submit();
         });
@@ -384,7 +830,7 @@ if ($order_enabled && $current_table) {
         
         let searchTimeout;
         const searchInput = document.getElementById('search');
-        if(searchInput) {
+        if (searchInput) {
             searchInput.addEventListener('input', function() {
                 clearTimeout(searchTimeout);
                 searchTimeout = setTimeout(() => {
@@ -402,16 +848,43 @@ if ($order_enabled && $current_table) {
             url.searchParams.set('lang', lang);
             window.location.href = url.toString();
         }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Customer mode
+            if (currentTable && !<?php echo $is_waiter ? 'true' : 'false'; ?>) {
+                loadCustomerCartFromServer();
+                if (document.getElementById('customer-table-info')) {
+                    document.getElementById('customer-table-info').innerHTML = '<i class="fas fa-table"></i> ' + currentTable.replace('TABLE_', 'Table ');
+                }
+                document.querySelectorAll('.customer-add-to-cart-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const mealId = parseInt(this.dataset.mealId);
+                        const mealName = this.dataset.mealName;
+                        const mealPrice = parseFloat(this.dataset.mealPrice);
+                        addToCustomerCart(mealId, mealName, mealPrice);
+                        toggleCustomerSidebar();
+                    });
+                });
+                const cartBtn = document.getElementById('customer-cart-btn');
+                if (cartBtn) cartBtn.addEventListener('click', toggleCustomerSidebar);
+            }
+            
+            // Waiter mode
+            <?php if ($is_waiter): ?>
+            document.querySelectorAll('.waiter-add-to-cart-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const mealId = parseInt(this.dataset.mealId);
+                    const mealName = this.dataset.mealName;
+                    const mealPrice = parseFloat(this.dataset.mealPrice);
+                    addToWaiterCart(mealId, mealName, mealPrice);
+                });
+            });
+            const waiterCartBtn = document.getElementById('waiter-cart-btn');
+            if (waiterCartBtn) waiterCartBtn.addEventListener('click', toggleWaiterSidebar);
+            <?php endif; ?>
+        });
     </script>
-    
-    <?php if ($order_enabled && $current_table): ?>
-        <?php echo getOrderSidebarHTML(); ?>
-        <?php echo getOrderJavaScript(); ?>
-    <?php elseif ($order_enabled && !$current_table): ?>
-        <div class="fixed bottom-4 right-4 bg-orange-custom text-white p-4 rounded-full shadow-lg z-40">
-            <i class="fas fa-qrcode text-xl"></i>
-        </div>
-    <?php endif; ?>
     
     <?php echo getThemeScript(); ?>
 </body>
