@@ -387,8 +387,8 @@ $page_title = $page_title ?? 'Admin Dashboard';
                 <a href="orders.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'orders.php' ? 'active' : ''; ?>">
                     <i class="fas fa-shopping-cart"></i> <?php echo t('orders'); ?>
                 </a>
-                <a href="../waiter/dashboard.php" class="block py-2 px-4 hover:bg-gray-700">
-                    <i class="fas fa-user-clock"></i> Waiter Panel
+               <a href="staff-management.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'staff-management.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-chalkboard-user"></i> Staff & Orders
                 </a>
                 <a href="logout.php" class="logout">
                     <i class="fas fa-sign-out-alt"></i> <?php echo t('logout'); ?>
